@@ -586,6 +586,7 @@ This document defines structural rules. Other architecture documents define doma
 | `25-ai-runtime` | AI workload specialization (introduces no new primitives) |
 | `26-runtime-api` | Public capability surface (Block 2 begins) |
 | `27-sdk` | Typed projection pattern (multi-language, no canonical crate) |
+| `28-cli` | Human command projection (closes the Runtime API / SDK / CLI trilogy) |
 
 The pipeline these documents describe together:
 
