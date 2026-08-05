@@ -64,7 +64,7 @@ Physical Replicas never cross a trust boundary automatically — replication acr
 
 ## Object Identity
 
-Every Object owns an Object ID, Type, Owner, Metadata, Security Context, Lifecycle, Placement, and State.
+Every Object owns an identity appropriate to its kind. Logical Objects are identified by `ObjectId`; Content Objects are identified by `ContentHash`. Every Object also owns a Type, Owner, Metadata, Security Context, Lifecycle, Placement, and State.
 
 Identity never changes. Metadata and State may evolve; identity remains stable. The identity scheme itself (ULID vs Content Hash) is defined by Runtime Primitives, not by this document.
 
@@ -125,7 +125,7 @@ Examples: labels, priority, region, compression, replication policy.
 
 Every Logical Object is versioned (ULID + `ObjectVersion`, per Runtime Primitives). Versioning enables compatibility, replication, migration, and rollback.
 
-Content Objects are not versioned — see "Three Kinds of Object" above.
+Content Objects are never versioned, because their content hash already uniquely identifies both identity and version — see "Three Kinds of Object" above.
 
 ## Serialization
 
@@ -133,7 +133,7 @@ Objects are transportable. Serialization is implementation-independent — see t
 
 ## Mobility
 
-Objects may move. Applications should not care where an Object is stored. The Runtime decides placement.
+Objects may move. Applications should not care where an Object is stored. The Runtime decides placement. Identity never changes during movement.
 
 ## Locality
 
@@ -142,6 +142,8 @@ Objects should remain close to computation whenever practical. Moving Objects ha
 ## Replication
 
 Replication is policy, not object identity. Replicas represent the same logical Content Object.
+
+Replication creates Physical Replicas. It never creates new Content Objects.
 
 Replication never crosses a trust boundary implicitly — see "Physical Replica" above.
 
@@ -154,6 +156,8 @@ Caches never own Objects. Caches hold temporary copies; ownership remains unchan
 ## Object Graph
 
 Objects may reference other Objects. References form a graph.
+
+Logical Objects form the mutable graph of Runtime knowledge. Content Objects form an immutable dependency graph.
 
 Because Content Objects are content-addressed, a cycle among them is structurally impossible — a hash cannot depend on itself. Cycles are only a theoretical concern for Logical Object references, and should be avoided unless explicitly required.
 
