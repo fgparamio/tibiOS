@@ -581,6 +581,7 @@ This document defines structural rules. Other architecture documents define doma
 | `20-admission-control` | Admission domain |
 | `21-runtime-storage-engine` | Storage domain |
 | `22-networking` | Networking domain |
+| `23-object-store` | Object resolution service |
 
 The pipeline these documents describe together:
 
