@@ -587,6 +587,7 @@ This document defines structural rules. Other architecture documents define doma
 | `26-runtime-api` | Public capability surface (Block 2 begins) |
 | `27-sdk` | Typed projection pattern (multi-language, no canonical crate) |
 | `28-cli` | Human command projection (closes the Runtime API / SDK / CLI trilogy) |
+| `29-deployment` | Runtime instance lifecycle (plane of existence, complements the Composition Root) |
 
 The pipeline these documents describe together:
 
