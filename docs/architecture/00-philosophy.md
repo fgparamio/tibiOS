@@ -199,6 +199,20 @@ The correct solution is to redefine boundaries, not to introduce shared ownershi
 
 Shared ownership increases coupling. Clear ownership reduces it.
 
+### Services Belong to Domains
+
+Ownership does not stop at state. A domain also owns the services that speak its language — the operations that interpret its concepts, not merely the data those concepts describe.
+
+Infrastructure provides capabilities: durability, transport, computation. It never owns the meaning of what it stores, sends, or executes. A service belongs to the domain whose language it speaks, regardless of which infrastructure implements the capability underneath it.
+
+This produces a small but complete symmetry:
+
+- Every domain owns its state.
+- Every domain owns the services that speak its language.
+- Every consumer owns the ports it requires (`02-project-structure.md`).
+
+These are not three separate rules. They are the same Ownership principle, seen from three angles: what is owned, by whom, and through what boundary.
+
 ### Communication
 
 Runtime domains interact through three complementary mechanisms.
@@ -244,6 +258,7 @@ The cost of flexibility is often hidden coupling. Ownership makes coupling expli
 - Authority and responsibility are inseparable.
 - Authoritative state changes propagate through facts, never through shared mutable state.
 - Shared ownership is a design error, not an optimization.
+- Every domain owns the services that speak its language; infrastructure provides capabilities, never meaning.
 
 ---
 

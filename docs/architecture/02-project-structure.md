@@ -397,6 +397,8 @@ Every Runtime concept belongs to exactly one owner.
 
 Ownership determines modification rights. Consumers observe. Owners decide.
 
+This applies to services as much as it applies to state — see `00-philosophy.md`'s Ownership principle: every domain owns the services that speak its language; infrastructure provides capabilities, never meaning.
+
 `Object` owns its own crate because the Object Model (identity, metadata, lifecycle, relationships, content reference) exists independently of how it is persisted — the same reasoning as the Repository pattern: the domain entity never depends on its persistence mechanism. `runtime-storage` implements `ObjectRepository` / `ContentStore` / the Object Lifecycle Log, but never owns the model.
 
 `Resource` stays inside `runtime-scheduler` because, unlike Object, it has no autonomous lifecycle — it is the language of the scheduling pipeline (Candidate Discovery → Filter → Score → Allocation).
