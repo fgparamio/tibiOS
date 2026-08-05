@@ -211,9 +211,9 @@ Each mechanism serves a different architectural purpose. They are not interchang
 
 Changes to authoritative state are never communicated by direct mutation.
 
-Instead, the owning domain publishes facts describing what has already changed.
+Instead, only the owning domain publishes facts describing what has already changed.
 
-Other domains may observe those facts. They may update their own projections. They never modify the authoritative state directly.
+Other domains may observe those facts. They may update their own projections. They never publish facts on behalf of the owning domain. They never modify the authoritative state directly.
 
 State changes therefore propagate through facts, not through shared mutable state.
 
