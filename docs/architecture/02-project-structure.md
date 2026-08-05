@@ -110,7 +110,9 @@ This is the only intentionally shared Runtime crate.
 
 ### Runtime Primitives
 
-Runtime Primitives contain only infrastructure-neutral concepts. Examples include `ObjectId`, `NodeId`, `WorkloadId`, `AllocationId`, `SessionId`, `TenantId`, `Lease`, `Timestamp`, `ContentHash`, `ObjectVersion`, `ErrorClass`.
+Runtime Primitives contain only infrastructure-neutral concepts. Examples include `ObjectId`, `NodeId`, `RuntimeId`, `WorkloadId`, `AllocationId`, `SessionId`, `TenantId`, `Lease`, `Timestamp`, `ContentHash`, `ObjectVersion`, `ErrorClass`.
+
+`RuntimeId` identifies a Runtime instance independently of the Nodes currently composing it — it is the Identity component of a Deployment Unit (`29-deployment.md`'s "Runtime + Configuration + Identity"), assigned when a Deployment Unit is created. `NodeId` answers which machine participates; `RuntimeId` answers which Runtime it belongs to — two different granularities, both needed once more than one Runtime instance can cooperate.
 
 These types form the ubiquitous language of the Runtime. They are shared because they describe concepts. They never implement domain behavior.
 
@@ -153,7 +155,7 @@ The exact dependency list may evolve. The architectural rule remains stable: inf
 
 ### Identity Model
 
-Mutable Runtime entities use ULID-based identities: `ObjectId`, `NodeId`, `WorkloadId`, `AllocationId`, `SessionId`, etc.
+Mutable Runtime entities use ULID-based identities: `ObjectId`, `NodeId`, `RuntimeId`, `WorkloadId`, `AllocationId`, `SessionId`, etc.
 
 The concrete ULID implementation remains encapsulated in newtypes (e.g. `pub struct ObjectId(Ulid)`). Runtime domains depend only on Runtime primitive types. They never depend directly on the underlying `ulid` library.
 
