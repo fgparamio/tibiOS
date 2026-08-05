@@ -60,7 +60,10 @@ tibios/
 │   ├── runtime-security/
 │   ├── runtime-observability/
 │   ├── runtime-state/
-│   └── runtime-api/
+│   ├── runtime-api/
+│   ├── runtime-replication/
+│   ├── runtime-deployment/
+│   └── runtime-federation/
 └── runtime/
 ```
 
@@ -570,28 +573,28 @@ This document defines structural rules. Other architecture documents define doma
 
 | Document | Defines |
 |---|---|
-| `00-philosophy` | Architectural principles |
-| `11-runtime` | Runtime responsibilities |
-| `02-project-structure` | Dependency architecture (this document) |
-| `13-object-model` | Object domain |
-| `14-resource-model` | Resource language |
-| `15-allocation-model` | Allocation domain |
-| `16-scheduling-engine` | Scheduling Engine |
-| `17-cluster-snapshot` | Cluster Snapshot |
-| `18-worker-model` | Worker domain |
-| `19-state-assembler` | Runtime state assembly |
-| `20-admission-control` | Admission domain |
-| `21-runtime-storage-engine` | Storage domain |
-| `22-networking` | Networking domain |
-| `23-object-store` | Object resolution service |
-| `24-replication` | Content availability service |
-| `25-ai-runtime` | AI workload specialization (introduces no new primitives) |
-| `26-runtime-api` | Public capability surface (Block 2 begins) |
-| `27-sdk` | Typed projection pattern (multi-language, no canonical crate) |
-| `28-cli` | Human command projection (closes the Runtime API / SDK / CLI trilogy) |
-| `29-deployment` | Runtime instance lifecycle (plane of existence, complements the Composition Root) |
-| `30-ai-services` | AI capability composition (no new crate — pure composition of 13/18/25/26/29) |
-| `31-federation` | Cross-Runtime cooperation (new domain — Federation Member, Trust Island, Federation Policy) |
+| `00-philosophy.md` | Architectural principles |
+| `11-runtime.md` | Runtime responsibilities |
+| `02-project-structure.md` | Dependency architecture (this document) |
+| `13-object-model.md` | Object domain |
+| `14-resource-model.md` | Resource language |
+| `15-allocation-model.md` | Allocation domain |
+| `16-scheduling-engine.md` | Scheduling Engine |
+| `17-cluster-snapshot.md` | Cluster Snapshot |
+| `18-worker-model.md` | Worker domain |
+| `19-state-assembler.md` | Runtime state assembly |
+| `20-admission-control.md` | Admission domain |
+| `21-runtime-storage-engine.md` | Storage domain |
+| `22-networking.md` | Networking domain |
+| `23-object-store.md` | Object resolution service |
+| `24-replication.md` | Content availability service |
+| `25-ai-runtime.md` | AI workload specialization (introduces no new primitives) |
+| `26-runtime-api.md` | Public capability surface (Block 2 begins) |
+| `27-sdk.md` | Typed projection pattern (multi-language, no canonical crate) |
+| `28-cli.md` | Human command projection (closes the Runtime API / SDK / CLI trilogy) |
+| `29-deployment.md` | Runtime instance lifecycle (plane of existence, complements the Composition Root) |
+| `30-ai-services.md` | AI capability composition (no new crate — pure composition of 13/18/25/26/29) |
+| `31-federation.md` | Cross-Runtime cooperation (new domain — Federation Member, Trust Island, Federation Policy) |
 
 The pipeline these documents describe together:
 

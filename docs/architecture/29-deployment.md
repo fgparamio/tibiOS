@@ -61,6 +61,8 @@ Configuration is declarative — it describes the Runtime instance Deployment sh
 
 Configuration is neither authoritative nor observational Runtime state. It is deployment input — fixed at the moment a Deployment Unit is created or reconfigured, never mutated by the Runtime itself while running.
 
+Deployment Configuration is deployment input, not a Configuration Object (`13-object-model.md`). It is never stored, versioned, or addressed through the Runtime Object Model unless explicitly imported as one.
+
 ## Process Launch
 
 Deployment produces the Runtime configuration and initiates process creation. From that point onward, Runtime startup follows `02-project-structure.md`'s Runtime Startup sequence unchanged: Create Configuration → Create Infrastructure → Create Domain Services → Inject Dependencies → Start Runtime. Deployment never redefines the Composition Root, and never performs any of its steps itself.

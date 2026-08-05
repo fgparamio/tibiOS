@@ -17,7 +17,7 @@ AI Services owns no crate of its own. Like `25-ai-runtime.md`, this document int
 - Service Objects (`13-object-model.md`)
 - Long-running Service Workers (`18-worker-model.md`)
 - AI Runtime specialization (`25-ai-runtime.md`)
-- Runtime API capabilities (`26-runtime-api.md`)
+- Runtime API operations (`26-runtime-api.md`)
 - Deployment (`29-deployment.md`)
 
 If a future AI Service pattern cannot be expressed through these five, that is evidence a genuinely new architectural question has appeared — and the answer is a new document, not logic quietly added here.
@@ -47,13 +47,13 @@ An AI Service is itself a Service Object, discovered and resolved through the Ob
 
 ## Relationship with Runtime API
 
-An AI Service is invoked through existing Runtime API capabilities. AI Services introduces no parallel API surface and no AI-specific transport.
+An AI Service is invoked through existing Runtime API operations. AI Services introduces no parallel API surface and no AI-specific transport.
 
 ## Composition
 
-An AI Service may orchestrate more than one Workload — retrieval, then generation, then post-processing. Composition is orchestration of existing capabilities, never creation of new ones. A composed AI Service is a Pipeline (`18-worker-model.md`'s execution pattern), not a new architectural concept layered on top of one. The Pipeline execution pattern already models this orchestration. AI Services merely gives it a reusable identity.
+An AI Service may orchestrate more than one Workload — retrieval, then generation, then post-processing. Composition is orchestration of existing operations, never creation of new ones. A composed AI Service is a Pipeline (`18-worker-model.md`'s execution pattern), not a new architectural concept layered on top of one. The Pipeline execution pattern already models this orchestration. AI Services merely gives it a reusable identity.
 
-An AI Service that composes other AI Services still composes at the level of Workloads and Objects — it never reaches into another AI Service's internal configuration. Composition happens between addressable Services, the same boundary the Runtime API already enforces between any two capabilities.
+An AI Service that composes other AI Services still composes at the level of Workloads and Objects — it never reaches into another AI Service's internal configuration. Composition happens between addressable Services, the same boundary the Runtime API already enforces between any two operations.
 
 ## Lifecycle
 
@@ -61,22 +61,22 @@ An AI Service follows the Object Lifecycle already defined in `13-object-model.m
 
 ## Observability
 
-An AI Service is observed exactly like any other Service Object, Workload, and Worker execution — through the Object Store's Observability (`23-object-store.md`) for resolution, and through the Runtime API's per-capability metrics (`26-runtime-api.md`) for invocation. AI Services introduces no dedicated observability mechanism.
+An AI Service is observed exactly like any other Service Object, Workload, and Worker execution — through the Object Store's Observability (`23-object-store.md`) for resolution, and through the Runtime API's per-operation metrics (`26-runtime-api.md`) for invocation. AI Services introduces no dedicated observability mechanism.
 
 ## Anti-Patterns
 
-Avoid: a `runtime-ai-services` crate, an "AI Service" Object kind distinct from Service Object, an AI-specific Runtime API capability alongside the existing ones, an AI Service registry parallel to the Object Store, embedding a Model Reference's content inside a Service's configuration, a composition mechanism distinct from the Pipeline execution pattern.
+Avoid: a `runtime-ai-services` crate, an "AI Service" Object kind distinct from Service Object, an AI-specific Runtime API operation alongside the existing ones, an AI Service registry parallel to the Object Store, embedding a Model Reference's content inside a Service's configuration, a composition mechanism distinct from the Pipeline execution pattern.
 
 ## Review Checklist
 
-Before adding to this document ask: can this be expressed as a Service Object, a Long-running Service or Pipeline, an AI Runtime specialization, or a Runtime API capability? If this requires a new crate, is that evidence a new architectural language has appeared instead of an extension to AI Services?
+Before adding to this document ask: can this be expressed as a Service Object, a Long-running Service or Pipeline, an AI Runtime specialization, or a Runtime API operation? If this requires a new crate, is that evidence a new architectural language has appeared instead of an extension to AI Services?
 
 ## Principles
 
 - AI Services introduces no new architectural primitives.
 - AI Services are Service Object specializations — the Runtime still does not know what AI is.
 - An AI Service executes as a Long-running Service or Pipeline, never a new execution pattern.
-- Composition is orchestration of existing capabilities, never creation of new ones.
+- Composition is orchestration of existing operations, never creation of new ones.
 - An AI Service's identity survives version changes; only its referenced configuration evolves.
 - AI Services defines reusable AI capabilities, never reusable AI infrastructure.
 - AI Services never maintains its own service registry. The Object Store already fulfills that role.

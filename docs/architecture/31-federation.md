@@ -41,7 +41,7 @@ Federation Trust produces a Federation Membership: a durable, authorized coopera
 
 ## Federation Policy
 
-Federation Trust decides *whether* two Runtimes may cooperate. Federation Policy decides *what* that cooperation permits — which capabilities of the Runtime API a federated peer may invoke, which Content Objects may cross the boundary via Replication, under what constraints. Policy is authorized configuration, evaluated on top of an already-established Federation Membership; it never substitutes for Federation Trust and is never evaluated before it.
+Federation Trust decides *whether* two Runtimes may cooperate. Federation Policy decides *what* that cooperation permits — which operations of the Runtime API a federated peer may invoke, which Content Objects may cross the boundary via Replication, under what constraints. Policy is authorized configuration, evaluated on top of an already-established Federation Membership; it never substitutes for Federation Trust and is never evaluated before it.
 
 Federation Policy is authoritative configuration, following the same category `24-replication.md`'s Replication Policy already established: it expresses desired cooperation, not observed state, and is never reconstructed by observation. Federation Membership is itself an authoritative fact, durably recorded and never inferred by observation.
 
@@ -51,7 +51,7 @@ Federation never reimplements Discovery, Authentication, Sessions, or Transport.
 
 ## Relationship with Runtime API
 
-Federation never invents a second inter-Runtime protocol. `26-runtime-api.md` already anticipated this: *"another TibiOS Runtime"* is listed among the Runtime API's consumers. A federated Runtime calls the same Runtime API capabilities any other consumer calls (`26`) — Submit Workload, Query Objects, Observe Events — the only difference is that Federation Policy, not just Trust and Authorization at the Boundary (`26`'s own model), gates which existing Runtime API capabilities a federated Runtime may invoke.
+Federation never invents a second inter-Runtime protocol. `26-runtime-api.md` already anticipated this: *"another TibiOS Runtime"* is listed among the Runtime API's consumers. A federated Runtime calls the same Runtime API operations any other consumer calls (`26`) — Submit Workload, Query Objects, Observe Events — the only difference is that Federation Policy, not just Trust and Authorization at the Boundary (`26`'s own model), gates which existing Runtime API operations a federated Runtime may invoke.
 
 ## Relationship with Replication
 
@@ -83,7 +83,7 @@ Active
 Revoked
 ```
 
-`Discovered` — another `RuntimeId` becomes known, through Networking's Discovery (`22`) or explicit configuration; discovery alone grants no cooperation. `Proposed` — a Federation Membership request exists but is not yet authorized on both sides. Federation Membership is always bilateral. One Runtime cannot federate another unilaterally. `Authorized` — both Runtimes' Trust authorities have approved the Membership. Authorization establishes that cooperation may exist. Federation Policy determines its scope. `Active` — capability invocations and content crossing are permitted per Policy. Active does not imply unrestricted cooperation. Federation Policy remains continuously in effect. `Revoked` — either Runtime's Trust authority may revoke unilaterally, publishing `FederationRevoked`, immediately terminating cooperation, following the same revocation principles already established for Node Trust.
+`Discovered` — another `RuntimeId` becomes known, through Networking's Discovery (`22`) or explicit configuration; discovery alone grants no cooperation. `Proposed` — a Federation Membership request exists but is not yet authorized on both sides. Federation Membership is always bilateral. One Runtime cannot federate another unilaterally. `Authorized` — both Runtimes' Trust authorities have approved the Membership. Authorization establishes that cooperation may exist. Federation Policy determines its scope. `Active` — operation invocations and content crossing are permitted per Policy. Active does not imply unrestricted cooperation. Federation Policy remains continuously in effect. `Revoked` — either Runtime's Trust authority may revoke unilaterally, publishing `FederationRevoked`, immediately terminating cooperation, following the same revocation principles already established for Node Trust.
 
 Federation Membership is an authoritative lifecycle, independent of Networking Sessions. Sessions may come and go without changing Membership; Membership may be revoked even while Sessions still exist.
 
@@ -95,7 +95,7 @@ A transient Networking failure between two federated Runtimes never revokes Fede
 
 ## Observability
 
-Federation exposes: Federation Membership state per `RuntimeId`, Federation Trust decisions (with reasons), Federation Policy evaluations (with reasons, symmetric to Scheduling's Filter explainability in `16-scheduling-engine.md`), and cross-Runtime capability invocation counts. It never exposes another Runtime's internal state beyond what that Runtime's own Runtime API already permits.
+Federation exposes: Federation Membership state per `RuntimeId`, Federation Trust decisions (with reasons), Federation Policy evaluations (with reasons, symmetric to Scheduling's Filter explainability in `16-scheduling-engine.md`), and cross-Runtime operation invocation counts. It never exposes another Runtime's internal state beyond what that Runtime's own Runtime API already permits.
 
 ## Anti-Patterns
 

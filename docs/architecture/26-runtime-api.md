@@ -4,7 +4,7 @@ Version: 1.0
 
 ## Purpose
 
-The Runtime API is the single coherent surface through which anything external — an application, the SDK, the CLI, another TibiOS Runtime — addresses the Runtime. It is not a protocol, not a transport, and not a new domain. It introduces no capability that does not already exist inside a Runtime domain (`13`–`25`); it only makes those capabilities addressable from outside the Runtime.
+The Runtime API is the single coherent surface through which anything external — an application, the SDK, the CLI, another TibiOS Runtime — addresses the Runtime. It is not a protocol, not a transport, and not a new domain. It introduces no operation that does not already exist inside a Runtime domain (`13`–`25`); it only makes those operations addressable from outside the Runtime.
 
 This document does not choose REST, gRPC, or any other protocol. It defines what can be asked of the Runtime, expressed in the Runtime's own language — the same discipline `02-project-structure.md`'s Ports already require: *"Ports express domain language. Ports never expose technology."*
 
@@ -14,16 +14,16 @@ The Runtime API owns its own crate, `runtime-api` — already reserved for this 
 
 ## Core Principles
 
-- The Runtime API exposes Runtime capabilities, never Runtime implementation.
-- The Runtime API is addressed to Runtime capabilities, never Runtime components. A consumer never talks to a Worker, a Scheduler, or a State Assembler — it talks to a capability, and the Runtime routes it internally to whichever domain owns that capability.
-- Every public capability corresponds to exactly one authoritative Runtime domain.
+- The Runtime API exposes Runtime operations, never Runtime implementation.
+- The Runtime API is addressed to Runtime API operations, never Runtime components. A consumer never talks to a Worker, a Scheduler, or a State Assembler — it talks to an operation, and the Runtime routes it internally to whichever domain owns that operation.
+- Every public operation corresponds to exactly one authoritative Runtime domain.
 - The Runtime API implements no domain logic. Every decision it surfaces was already made by the domain that owns it.
-- The Runtime API composes existing capabilities. It never invents new ones.
-- Technology is an adapter. The capability surface is stable independent of REST, gRPC, or any future protocol.
+- The Runtime API composes existing operations. It never invents new ones.
+- Technology is an adapter. The Runtime API Surface is stable independent of REST, gRPC, or any future protocol.
 
-## Capability Surface
+## Runtime API Surface
 
-The Runtime exposes a finite set of capabilities, never a resource, endpoint, or transport shape. Each capability answers one question a consumer can ask of the Runtime:
+The Runtime exposes a finite set of operations, never a resource, endpoint, or transport shape. Each operation answers one question a consumer can ask of the Runtime:
 
 - **Submit Workload** — request that a Workload be admitted and, eventually, executed.
 - **Query Objects** — resolve an Object reference to its current state or content.
@@ -33,17 +33,17 @@ The Runtime exposes a finite set of capabilities, never a resource, endpoint, or
 - **Inspect Cluster** — obtain a scheduling-relevant view of cluster state.
 - **Manage Allocations** — inspect, renew, or release the Allocations bound to a Workload.
 
-This list is deliberately not exhaustive and not final — a capability is added only when a Runtime domain already exposes it through an Inbound Port and no existing capability already covers it (see Review Checklist). The Capability Surface grows only by discovery, the same rule `00-philosophy.md` applies to the architecture as a whole.
+This list is deliberately not exhaustive and not final — an operation is added only when a Runtime domain already exposes it through an Inbound Port and no existing operation already covers it (see Review Checklist). The Runtime API Surface grows only by discovery, the same rule `00-philosophy.md` applies to the architecture as a whole.
 
 ## Technology Independence
 
-A capability is expressed as an operation with typed inputs and outputs, never as an HTTP verb, a URL path, or a protobuf message. `SubmitWorkload(WorkloadSpec) -> WorkloadId` is a capability; `POST /v1/workloads` is one possible adapter over it. The Runtime API may be exposed simultaneously through multiple adapters (gRPC, REST, an embedded Rust library) without the capability definitions changing — exactly `02-project-structure.md`'s Adapter Ownership rule, applied at the Runtime's outermost boundary instead of between two internal domains.
+An operation has typed inputs and outputs, never an HTTP verb, a URL path, or a protobuf message. `SubmitWorkload(WorkloadSpec) -> WorkloadId` is an operation; `POST /v1/workloads` is one possible adapter over it. The Runtime API may be exposed simultaneously through multiple adapters (gRPC, REST, an embedded Rust library) without the operation definitions changing — exactly `02-project-structure.md`'s Adapter Ownership rule, applied at the Runtime's outermost boundary instead of between two internal domains.
 
 ## Relationship with Runtime Domains
 
-Every capability maps to exactly one authoritative Runtime domain. The Runtime API owns no capability's meaning — only its address. This table is the Ownership principle applied at the Runtime boundary.
+Every Runtime API operation maps to exactly one authoritative Runtime domain. The Runtime API owns no operation's meaning — only its address. This table is the Ownership principle applied at the Runtime boundary.
 
-| Capability | Runtime Domain |
+| Runtime API Operation | Runtime Domain |
 |---|---|
 | Submit Workload | Admission (`20-admission-control.md`) |
 | Query Objects | Object Store (`23-object-store.md`) |
@@ -55,15 +55,15 @@ Every capability maps to exactly one authoritative Runtime domain. The Runtime A
 
 Clients subscribe to event streams. They never subscribe to Runtime domains directly — the domain that owns an event never knows, or needs to know, that a client exists.
 
-Each row is a pointer to a capability the owning domain already exposes. `runtime-api` contains no business logic. It merely exposes these capabilities through technology-specific adapters.
+Each row is a pointer to an operation the owning domain already exposes. `runtime-api` contains no business logic. It merely exposes these operations through technology-specific adapters.
 
-Every document in the Runtime Core answered a question of the shape "who owns X?" This document answers a different one: **who is allowed to expose X to the outside world?** The public Runtime capability surface is owned by exactly one crate: `runtime-api`. Domains remain the sole owners of meaning; `runtime-api` is the sole owner of the public surface.
+Every document in the Runtime Core answered a question of the shape "who owns X?" This document answers a different one: **who is allowed to expose X to the outside world?** The public Runtime API Surface is owned by exactly one crate: `runtime-api`. Domains remain the sole owners of meaning; `runtime-api` is the sole owner of the public surface.
 
 ## Authentication and Authorization at the Boundary
 
 Every request arriving at `runtime-api` carries an identity. Authentication verifies that identity; authorization decides what it may do — the same two-stage separation `22-networking.md` already established for peer-to-peer communication (*"Authentication proves identity. It does not grant authorization."*), applied here at the external boundary instead of between Runtime instances.
 
-`runtime-api` never makes an authorization decision itself. It authenticates the caller, then asks Trust whether the authenticated identity is authorized for the requested capability — exactly the same query Networking already makes before establishing a Session (`22-networking.md`'s Trust Authorization). Authorization is evaluated before routing. Routing is never used to determine authorization. A request that fails authorization is rejected before it reaches any Runtime domain; the owning domain never sees an unauthorized request.
+`runtime-api` never makes an authorization decision itself. It authenticates the caller, then asks Trust whether the authenticated identity is authorized for the requested operation — exactly the same query Networking already makes before establishing a Session (`22-networking.md`'s Trust Authorization). Authorization is evaluated before routing. Routing is never used to determine authorization. A request that fails authorization is rejected before it reaches any Runtime domain; the owning domain never sees an unauthorized request.
 
 ## Error Model
 
@@ -75,37 +75,37 @@ This is the same responsibility an Adapter has in Ports & Adapters (`02-project-
 
 ## Versioning & Stability
 
-A capability's contract may evolve, but only forward: new optional fields, new capabilities, never a silent change in the meaning of an existing one. `runtime-api` exposes a new contract version when a capability contract evolves — the evolution is the owning domain's decision; `runtime-api` only publishes it, consistent with `02-project-structure.md`'s Stable Dependencies rule (*"Changing an implementation should never require changing dependent domains. Only contract evolution should affect consumers."*).
+An operation's contract may evolve, but only forward: new optional fields, new operations, never a silent change in the meaning of an existing one. `runtime-api` exposes a new contract version when an operation's contract evolves — the evolution is the owning domain's decision; `runtime-api` only publishes it, consistent with `02-project-structure.md`'s Stable Dependencies rule (*"Changing an implementation should never require changing dependent domains. Only contract evolution should affect consumers."*).
 
-Multiple contract versions may be served concurrently by different adapters over the same underlying capabilities — versioning is a property of the public contract, never of the Runtime domain behind it. Consumers version against capabilities, never against implementations.
+Multiple contract versions may be served concurrently by different adapters over the same underlying operations — versioning is a property of the public contract, never of the Runtime domain behind it. Consumers version against operations, never against implementations.
 
-Three adapters now share the same shape across the architecture: Storage translates facts into persistence (`21-runtime-storage-engine.md`), Networking translates facts into transport (`22-networking.md`), and `runtime-api` translates capabilities into public contract. All three preserve meaning; none of them owns it; each changes only the medium.
+Three adapters now share the same shape across the architecture: Storage translates facts into persistence (`21-runtime-storage-engine.md`), Networking translates facts into transport (`22-networking.md`), and `runtime-api` translates operations into public contract. All three preserve meaning; none of them owns it; each changes only the medium.
 
 ## Observability
 
-`runtime-api` exposes request latency, request volume per capability, authentication failures, authorization failures, and per-capability error rates. It never exposes domain-internal metrics directly — those belong to the owning domain's own Observability (`09-observability.md`); `runtime-api` only measures its own translation layer.
+`runtime-api` exposes request latency, request volume per operation, authentication failures, authorization failures, and per-operation error rates. It never exposes domain-internal metrics directly — those belong to the owning domain's own Observability (`09-observability.md`); `runtime-api` only measures its own translation layer.
 
 ## Anti-Patterns
 
-Avoid: business logic inside `runtime-api`, capabilities that don't map to an existing Inbound Port, authorization decisions made inside `runtime-api` instead of delegated to Trust, protocol-specific concepts (HTTP verbs, gRPC streams) leaking into capability definitions, a generic error type that discards a domain's specific reason, breaking an existing capability's contract instead of versioning it, clients addressing a Runtime domain or component by name.
+Avoid: business logic inside `runtime-api`, operations that don't map to an existing Inbound Port, authorization decisions made inside `runtime-api` instead of delegated to Trust, protocol-specific concepts (HTTP verbs, gRPC streams) leaking into operation definitions, a generic error type that discards a domain's specific reason, breaking an existing operation's contract instead of versioning it, clients addressing a Runtime domain or component by name.
 
 ## Review Checklist
 
-Before adding a new capability ask: does an existing Runtime domain already expose this through an Inbound Port? Does it map to exactly one authoritative domain? Is it expressed independently of any transport? Does authorization happen before routing, not inside it? Does its error surface preserve the owning domain's reason? Would removing `runtime-api` still leave every domain fully capable internally?
+Before adding a new operation ask: does an existing Runtime domain already expose this through an Inbound Port? Does it map to exactly one authoritative domain? Is it expressed independently of any transport? Does authorization happen before routing, not inside it? Does its error surface preserve the owning domain's reason? Would removing `runtime-api` still leave every domain fully capable internally?
 
 ## Principles
 
-- The Runtime API exposes Runtime capabilities, never Runtime implementation.
-- The Runtime API is addressed to Runtime capabilities, never Runtime components.
-- Every public capability corresponds to exactly one authoritative Runtime domain.
-- The Runtime API composes existing capabilities. It never invents new ones.
+- The Runtime API exposes Runtime operations, never Runtime implementation.
+- The Runtime API is addressed to Runtime operations, never Runtime components.
+- Every public operation corresponds to exactly one authoritative Runtime domain.
+- The Runtime API composes existing operations. It never invents new ones.
 - The Runtime API implements no domain logic. Every decision it surfaces was already made by the domain that owns it.
 - Authorization is evaluated before routing, never determined by it.
 - Only the domain that owns a decision may produce the error describing it.
-- Consumers version against capabilities, never against implementations.
+- Consumers version against operations, never against implementations.
 - Domains remain the sole owners of meaning; `runtime-api` is the sole owner of the public surface.
-- Technology is an adapter. The capability surface is stable independent of REST, gRPC, or any future protocol.
+- Technology is an adapter. The Runtime API Surface is stable independent of REST, gRPC, or any future protocol.
 
 ## Motto
 
-Expose capabilities. Preserve meaning. Translate faithfully.
+Expose operations. Preserve meaning. Translate faithfully.

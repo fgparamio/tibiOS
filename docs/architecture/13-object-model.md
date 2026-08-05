@@ -103,6 +103,8 @@ The Runtime recognizes object categories: Workload, Message, Actor, Service, Dat
 
 Future object types may be added without modifying existing ones.
 
+Configuration Objects are Runtime Objects — persisted, versioned, addressed by `ObjectId` like any other Logical Object. They must not be confused with Deployment Configuration (`29-deployment.md`), which exists before a Runtime instance is created and is never part of the Runtime Object Model.
+
 ## References
 
 Objects reference other Objects through IDs — never through memory addresses. Object references remain valid across machines.
