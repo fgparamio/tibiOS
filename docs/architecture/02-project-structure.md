@@ -584,6 +584,7 @@ This document defines structural rules. Other architecture documents define doma
 | `23-object-store` | Object resolution service |
 | `24-replication` | Content availability service |
 | `25-ai-runtime` | AI workload specialization (introduces no new primitives) |
+| `26-runtime-api` | Public capability surface (Block 2 begins) |
 
 The pipeline these documents describe together:
 
