@@ -582,6 +582,7 @@ This document defines structural rules. Other architecture documents define doma
 | `21-runtime-storage-engine` | Storage domain |
 | `22-networking` | Networking domain |
 | `23-object-store` | Object resolution service |
+| `24-replication` | Content availability service |
 
 The pipeline these documents describe together:
 
