@@ -591,6 +591,7 @@ This document defines structural rules. Other architecture documents define doma
 | `28-cli` | Human command projection (closes the Runtime API / SDK / CLI trilogy) |
 | `29-deployment` | Runtime instance lifecycle (plane of existence, complements the Composition Root) |
 | `30-ai-services` | AI capability composition (no new crate — pure composition of 13/18/25/26/29) |
+| `31-federation` | Cross-Runtime cooperation (new domain — Federation Member, Trust Island, Federation Policy) |
 
 The pipeline these documents describe together:
 
