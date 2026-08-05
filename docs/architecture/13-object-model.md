@@ -60,7 +60,7 @@ Physical Replica, Physical Replica, ...
 
 Precedent: this is the same three-tier separation used by Git (tag/commit), container registries (image tag/digest), and IPNS/IPFS (mutable name/immutable content).
 
-Physical Replicas never cross a trust boundary automatically — replication across islands requires explicit authorization, never happens implicitly (see `08-security` / trust boundaries in `22-networking.md`).
+Physical Replicas never cross a trust boundary automatically — replication across islands requires explicit authorization, never happens implicitly (see `08-security.md` / trust boundaries in `22-networking.md`).
 
 ## Object Identity
 

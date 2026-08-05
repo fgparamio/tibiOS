@@ -27,7 +27,7 @@ Runtime → observed by → State Assembler → produces → Cluster Snapshot �
 Enriching a Node through progressively lower-volatility to higher-volatility layers (`00-philosophy.md`'s Volatility principle), each stage owned by exactly one domain, each answering exactly one question:
 
 ```
-Networking / Trust
+     Trust
         │
         ▼
     Membership
@@ -42,7 +42,7 @@ Networking / Trust
  Cluster Snapshot
 ```
 
-The mechanics of each stage (Noise handshake, certificates, ACLs, heartbeats) belong to their owning domains (`22-networking.md`) — this pipeline shows only the domain-level sequence the State Assembler observes, not their internals.
+Each stage is owned by exactly one domain: Trust, Membership, Health, Resources. The mechanics behind the Trust stage (Noise handshake, cryptographic identity, certificates, ACLs) belong to `22-networking.md` — Networking establishes the authenticated identity and queries Trust, but the fact the State Assembler observes is the one Trust publishes: this node is Trusted. This pipeline shows only the domain-level sequence the State Assembler observes, not the internals of any stage.
 
 Each stage enriches the node; it never re-derives what an earlier, lower-volatility stage already established — Trust is never recomputed because a heartbeat arrived, and Membership never requires repeating cryptographic authentication. On revocation, propagation is forward: a `TrustRevoked` fact (see `22-networking.md`) invalidates the current Snapshot, triggering a fresh one built without that node — reusing the same invalidation mechanism already used for Optimistic Concurrency Control, not a special-cased "backward" flow.
 

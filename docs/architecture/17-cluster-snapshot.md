@@ -33,7 +33,7 @@ Every architectural layer answers exactly one question, at its own natural rate 
 
 Mixing data with radically different volatility in one component causes unnecessary cache invalidation, unnecessary recomputation, and unnecessary coupling. Trust should never be recomputed because a heartbeat arrived; Membership should never require repeating cryptographic authentication.
 
-Only Runtime-approved (trusted, per Networking) members appear inside a Snapshot at all.
+Only Runtime-approved (trusted, per Trust) members appear inside a Snapshot at all.
 
 ## Snapshot Contents
 
