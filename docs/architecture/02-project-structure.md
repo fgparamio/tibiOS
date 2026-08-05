@@ -583,6 +583,7 @@ This document defines structural rules. Other architecture documents define doma
 | `22-networking` | Networking domain |
 | `23-object-store` | Object resolution service |
 | `24-replication` | Content availability service |
+| `25-ai-runtime` | AI workload specialization (introduces no new primitives) |
 
 The pipeline these documents describe together:
 
