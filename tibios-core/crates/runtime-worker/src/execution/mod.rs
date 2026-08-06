@@ -4,3 +4,5 @@
 //! events a Worker emits and the reports it returns while performing it.
 
 pub mod context;
+pub mod event;
+pub mod report;
