@@ -27,6 +27,7 @@ from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
 from tibios_ray.capabilities.rerank import RerankProvider
+from tibios_ray.capabilities.speech import SpeechSynthesisProvider, SpeechTranscriptionProvider
 from tibios_ray.capabilities.vision import VisionProvider
 from tibios_ray.execution.context import ExecutionContext
 from tibios_ray.execution.events import EndOfStream
@@ -40,6 +41,8 @@ _PROVIDERS: tuple[CapabilityProvider, ...] = (
     EmbeddingProvider(),
     RerankProvider(),
     VisionProvider(),
+    SpeechTranscriptionProvider(),
+    SpeechSynthesisProvider(),
 )
 
 # Family Label Convention (FLC, design.md CP5): lowercase, `_`-separated,

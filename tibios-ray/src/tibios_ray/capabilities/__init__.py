@@ -19,6 +19,7 @@ from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
 from tibios_ray.capabilities.rerank import RerankProvider
+from tibios_ray.capabilities.speech import SpeechSynthesisProvider, SpeechTranscriptionProvider
 from tibios_ray.capabilities.vision import VisionProvider
 
 __all__ = [
@@ -32,5 +33,7 @@ __all__ = [
     "ModelFamily",
     "NoBackendAvailableError",
     "RerankProvider",
+    "SpeechSynthesisProvider",
+    "SpeechTranscriptionProvider",
     "VisionProvider",
 ]

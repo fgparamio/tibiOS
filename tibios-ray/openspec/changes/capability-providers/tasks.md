@@ -70,13 +70,13 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 5.4 Update `capabilities/__init__.py` to export `VisionProvider`
 - [x] 5.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
-## Slice 6 — Speech Providers (transcribe + synthesize) (PR 6)
+## Slice 6 — Speech Providers (transcribe + synthesize) (PR 6) — COMPLETE
 
-- [ ] 6.1 RED: `tests/unit/capabilities/test_speech.py` — `SPEECH_TRANSCRIBE_DESCRIPTOR` (family `whisper`, backend `faster_whisper`, flag streaming only) and `SPEECH_SYNTHESIZE_DESCRIPTOR` (family `kokoro`, backend `onnxruntime`, flag streaming only), both class equality + naming per design (`SpeechTranscriptionProvider`, `SpeechSynthesisProvider`)
-- [ ] 6.2 GREEN: create `src/tibios_ray/capabilities/speech.py` with both descriptors and both Provider classes
-- [ ] 6.3 Append `SpeechTranscriptionProvider()` and `SpeechSynthesisProvider()` to `_PROVIDERS` tuple
-- [ ] 6.4 Update `capabilities/__init__.py` to export both classes
-- [ ] 6.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
+- [x] 6.1 RED: `tests/unit/capabilities/test_speech.py` — `SPEECH_TRANSCRIBE_DESCRIPTOR` (family `whisper`, backend `faster_whisper`, flag streaming only) and `SPEECH_SYNTHESIZE_DESCRIPTOR` (family `kokoro`, backend `onnxruntime`, flag streaming only), both class equality + naming per design (`SpeechTranscriptionProvider`, `SpeechSynthesisProvider`)
+- [x] 6.2 GREEN: create `src/tibios_ray/capabilities/speech.py` with both descriptors and both Provider classes
+- [x] 6.3 Append `SpeechTranscriptionProvider()` and `SpeechSynthesisProvider()` to `_PROVIDERS` tuple
+- [x] 6.4 Update `capabilities/__init__.py` to export both classes
+- [x] 6.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
 ## Slice 7 — OCR Provider (PR 7)
 
