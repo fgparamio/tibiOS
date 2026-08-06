@@ -224,8 +224,35 @@ class VllmTextBackend:
     async def generate(
         self, session: BackendSession, request: TextRequest
     ) -> AsyncIterator[TextChunk]:
-        raise NotImplementedError("generate() lands in PR 2")
-        yield  # pragma: no cover - makes this an async generator function
+        entry = self._session_for(session)
+        request_id = f"{session.session_id}:{uuid4().hex}"
+        stream = entry.runtime.engine.generate(
+            prompt=request.prompt,
+            sampling_params=self._params_factory(request),
+            request_id=request_id,
+        )
+        # VL5: no lock — concurrent multiplexed requests across
+        # sessions of the same engine is the entire reason to run
+        # vLLM. This async-for is the entire call path: no bridge
+        # thread, no bounded queue, nothing bridging it to the loop.
+        async for output in stream:
+            text = output.outputs[0].text if output.outputs else ""
+            if output.finished:
+                # VL10: the terminal chunk is sourced straight from
+                # the SDK's own `finished` field — no lookahead.
+                yield TextChunk(text=text, finished=True)
+                return
+            if text:  # drop empty non-terminal deltas
+                yield TextChunk(text=text, finished=False)
+        # VL10: defensive synthetic terminator — the SDK generator
+        # exhausted without ever setting finished=True.
+        yield TextChunk(text="", finished=True)
+
+    def _session_for(self, session: BackendSession) -> _SessionEntry:
+        entry = self._sessions.get(session.session_id)
+        if entry is None:
+            raise UnknownSessionError(session.session_id)
+        return entry
 
 
 def _new_session_id() -> str:
