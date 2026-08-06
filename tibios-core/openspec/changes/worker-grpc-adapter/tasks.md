@@ -43,12 +43,12 @@
 
 *(mechanical; independently mergeable in parallel with Phase 1; blocks Phase 3; design D8)*
 
-- [ ] 2.1 Create `tibios-core/proto/README.md`: provenance (upstream path `../TibiOS/proto/`, revision the copy was taken from — **manual, unchecked, stated plainly as such**), `protoc` install commands per OS (D5: macOS `brew install protobuf`, Debian/Ubuntu `apt-get install -y protobuf-compiler`), the `PROTOC=` override, the manifest regenerate/verify commands, and the 3-step re-vendor ritual (re-vendor, regenerate manifest, commit both).
-- [ ] 2.2 Vendor `tibios/primitives/v1/identity.proto` byte-identically from `../TibiOS/proto/tibios/primitives/v1/identity.proto` (frozen state) into `tibios-core/proto/tibios/primitives/v1/identity.proto`. No edits during vendoring.
-- [ ] 2.3 Vendor `tibios/worker/v1/worker.proto` byte-identically into `tibios-core/proto/tibios/worker/v1/worker.proto`. No edits during vendoring.
-- [ ] 2.4 Generate `PROTO_MANIFEST.sha256`: `cd proto && fd -e proto -t f . | sort | xargs shasum -a 256 > PROTO_MANIFEST.sha256` — one line per file, 64-hex + two spaces + path relative to `proto/`, sorted by path, LF-terminated, no comments, no blank lines (GNU `sha256sum -c` compatibility).
-- [ ] 2.5 Verify: `cd proto && shasum -a 256 -c PROTO_MANIFEST.sha256` passes.
-- [ ] 2.6 Self-review: the vendored tree mirrors the umbrella layout exactly (`tibios/primitives/v1/`, `tibios/worker/v1/`, sibling structure), so `-I proto` produces byte-identical import paths; if `../proto/` (or `../TibiOS/proto/`) is reachable locally, diff the vendored files against it to confirm zero drift before committing.
+- [x] 2.1 Create `tibios-core/proto/README.md`: provenance (upstream path `../TibiOS/proto/`, revision the copy was taken from — **manual, unchecked, stated plainly as such**), `protoc` install commands per OS (D5: macOS `brew install protobuf`, Debian/Ubuntu `apt-get install -y protobuf-compiler`), the `PROTOC=` override, the manifest regenerate/verify commands, and the 3-step re-vendor ritual (re-vendor, regenerate manifest, commit both).
+- [x] 2.2 Vendor `tibios/primitives/v1/identity.proto` byte-identically from `../TibiOS/proto/tibios/primitives/v1/identity.proto` (frozen state) into `tibios-core/proto/tibios/primitives/v1/identity.proto`. No edits during vendoring.
+- [x] 2.3 Vendor `tibios/worker/v1/worker.proto` byte-identically into `tibios-core/proto/tibios/worker/v1/worker.proto`. No edits during vendoring.
+- [x] 2.4 Generate `PROTO_MANIFEST.sha256`: `cd proto && fd -e proto -t f . | sort | xargs shasum -a 256 > PROTO_MANIFEST.sha256` — one line per file, 64-hex + two spaces + path relative to `proto/`, sorted by path, LF-terminated, no comments, no blank lines (GNU `sha256sum -c` compatibility).
+- [x] 2.5 Verify: `cd proto && shasum -a 256 -c PROTO_MANIFEST.sha256` passes.
+- [x] 2.6 Self-review: the vendored tree mirrors the umbrella layout exactly (`tibios/primitives/v1/`, `tibios/worker/v1/`, sibling structure), so `-I proto` produces byte-identical import paths; if `../proto/` (or `../TibiOS/proto/`) is reachable locally, diff the vendored files against it to confirm zero drift before committing.
 
 ---
 
