@@ -32,16 +32,16 @@ Chain strategy: stacked-to-main
 
 ## Phase 0: Precondition
 
-- [ ] 0.1 Apply `python-foundation` (own change, proposal-only today, no tasks.md) — pytest/ruff/pyright + package layout must land before any task below.
+- [x] 0.1 Apply `python-foundation` (own change, proposal-only today, no tasks.md) — pytest/ruff/pyright + package layout must land before any task below. Applied directly 2026-08-06 (see `sdd/python-foundation/apply-progress`).
 
 ## Phase 1: execution/ vocabulary (PR 1)
 
-- [ ] 1.1 `ids.py`: `ObjectId`, `ObjectVersion`, `ContentHash` (frozen, slotted; D3)
-- [ ] 1.2 `context.py`: `ExecutionContext`, `AllocationContract`, `ResolvedModelRef` (only constructible from `ctx.dependencies`)
-- [ ] 1.3 `channel.py`: `ExecutionChannel` (write-only `emit`), `CancellationToken` Protocol (D5)
-- [ ] 1.4 `events.py`: `ExecutionEvent` PEP 695 tagged union (D7)
-- [ ] 1.5 `report.py`: `ExecutionReport`, `ExecutionPulse`, `ExecutionPhase`
-- [ ] 1.6 `tests/unit/execution/`: immutability + `ResolvedModelRef` proof-carrying construction
+- [x] 1.1 `ids.py`: `ObjectId`, `ObjectVersion`, `ContentHash` (frozen, slotted; D3)
+- [x] 1.2 `context.py`: `ExecutionContext`, `AllocationContract`, `ResolvedModelRef` (only constructible from `ctx.dependencies`)
+- [x] 1.3 `channel.py`: `ExecutionChannel` (write-only `emit`), `CancellationToken` Protocol (D5)
+- [x] 1.4 `events.py`: `ExecutionEvent` PEP 695 tagged union (D7)
+- [x] 1.5 `report.py`: `ExecutionReport`, `ExecutionPulse`, `ExecutionPhase`
+- [x] 1.6 `tests/unit/execution/`: immutability + `ResolvedModelRef` proof-carrying construction — done 2026-08-06, 47/47 tests passing, ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
 
 ## Phase 2: backends/ contract (PR 2)
 
