@@ -37,17 +37,17 @@ Chain strategy: stacked-to-main
 
 ## PR 2 — In-Process Worker + Factory (base: PR 1 branch)
 
-- [ ] 2.1 RED — `runtime/src/worker/registry.rs`: `Registry::try_acquire` succeeds for a fresh id, returns `None` for an already-registered id; `RegistrationGuard` drop deregisters.
-- [ ] 2.2 GREEN — implement `Registry`/`Registration`/`RegistrationGuard` (`Arc<Mutex<BTreeMap<WorkloadId, Registration>>>`, `with_registry` helper, no `MutexGuard` crosses `.await`).
-- [ ] 2.3 RED — O1: call `execute(..)` without awaiting, then `cancel` immediately ⇒ `Ok(CancelAck)`.
-- [ ] 2.4 RED — O2: after success/failure/cancelled completion, `pulse` ⇒ `Err(UnknownWorkload)`.
-- [ ] 2.5 RED — O3: `cancel`/`pulse` on unregistered id ⇒ `Err(UnknownWorkload)`.
-- [ ] 2.6 RED — O4: second `execute` for an in-flight id ⇒ `Err(DuplicateWorkload)` immediately, no second run starts.
-- [ ] 2.7 GREEN — `runtime/src/worker/in_process.rs`: `pub(super) struct InProcessWorker`; synchronous `RegistrationGuard::try_acquire` before the returned future to pass 2.3-2.6.
-- [ ] 2.8 RED — full event sequence (Progress → per-chunk OutputChunk+Progress → MetricsSnapshot → EndOfStream) reaches a real `MpscExecutionChannel` receiver; mid-run cancellation still returns a `Cancelled` report.
-- [ ] 2.9 GREEN — implement `run_execution` (`tokio::task::yield_now().await` per chunk, FNV-1a checksum seeded from `workload_id`, cancellation/duration-breach check, `ExecutionReport` with `trace_id` from `observability_context()`) to pass 2.8.
-- [ ] 2.10 (structural, exempt — compiler-enforced) Add `pub fn in_process_worker() -> impl WorkerService` to `runtime/src/worker/mod.rs`; keep `InProcessWorker`/`Registry` `pub(super)`, never re-exported.
-- [ ] 2.11 Verify: `cargo test -p runtime`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt`.
+- [x] 2.1 RED — `runtime/src/worker/registry.rs`: `Registry::try_acquire` succeeds for a fresh id, returns `None` for an already-registered id; `RegistrationGuard` drop deregisters.
+- [x] 2.2 GREEN — implement `Registry`/`Registration`/`RegistrationGuard` (`Arc<Mutex<HashMap<WorkloadId, Registration>>>` — deviation from the design's `BTreeMap`: `WorkloadId` derives `Hash + Eq`, not `Ord`, so a literal `BTreeMap<WorkloadId, _>` does not compile; `HashMap` preserves the same single-mutex-guarded-map rationale — `with_registry` helper, no `MutexGuard` crosses `.await`).
+- [x] 2.3 RED — O1: call `execute(..)` without awaiting, then `cancel` immediately ⇒ `Ok(CancelAck)`.
+- [x] 2.4 RED — O2: after success/failure/cancelled completion, `pulse` ⇒ `Err(UnknownWorkload)`.
+- [x] 2.5 RED — O3: `cancel`/`pulse` on unregistered id ⇒ `Err(UnknownWorkload)`.
+- [x] 2.6 RED — O4: second `execute` for an in-flight id ⇒ `Err(DuplicateWorkload)` immediately, no second run starts.
+- [x] 2.7 GREEN — `runtime/src/worker/in_process.rs`: `pub(super) struct InProcessWorker`; synchronous `RegistrationGuard::try_acquire` before the returned future to pass 2.3-2.6.
+- [x] 2.8 RED — full event sequence (Progress → per-chunk OutputChunk+Progress → MetricsSnapshot → EndOfStream) reaches a real `MpscExecutionChannel` receiver; mid-run cancellation still returns a `Cancelled` report.
+- [x] 2.9 GREEN — implement `run_execution` (`tokio::task::yield_now().await` per chunk, FNV-1a checksum seeded from `workload_id`, cancellation/duration-breach check, `ExecutionReport` with `trace_id` from `observability_context()`) to pass 2.8.
+- [x] 2.10 (structural, exempt — compiler-enforced) Add `pub fn in_process_worker() -> impl WorkerService` to `runtime/src/worker/mod.rs`; keep `InProcessWorker`/`Registry` `pub(super)`, never re-exported.
+- [x] 2.11 Verify: `cargo test -p runtime`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt`.
 
 ## PR 3 — `main.rs` Wiring + Smoke (base: PR 2 branch)
 
