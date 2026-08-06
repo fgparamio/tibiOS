@@ -13,6 +13,7 @@ will extend `generate()`/`abort()` with the same knobs `StubLlama`
 grew across llamacpp-backend's slices — not needed yet.
 """
 
+import threading
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -34,11 +35,23 @@ class StubAsyncLLM:
     exercised until PR 2 — PR 1's tests only construct instances and
     call `shutdown()`/`abort()` for refcount/teardown coverage."""
 
-    def __init__(self, outputs: Sequence[StubRequestOutput] = ()) -> None:
+    def __init__(
+        self,
+        outputs: Sequence[StubRequestOutput] = (),
+        *,
+        shutdown_block_event: threading.Event | None = None,
+        shutdown_started_event: threading.Event | None = None,
+    ) -> None:
         self.outputs = outputs
         self.shutdown_calls = 0
         self.abort_calls: list[str] = []
         self.generate_calls: list[dict[str, Any]] = []
+        # `shutdown()` runs on a worker thread (`asyncio.to_thread`, VL13
+        # teardown), so this is a `threading.Event`, not `asyncio.Event`
+        # — lets a test park `shutdown()` mid-call and observe ordering
+        # against a concurrent `acquire()` (`test_vllm_teardown_race.py`).
+        self._shutdown_block_event = shutdown_block_event
+        self._shutdown_started_event = shutdown_started_event
 
     async def generate(
         self, prompt: str, sampling_params: Any, request_id: str
@@ -53,6 +66,10 @@ class StubAsyncLLM:
         self.abort_calls.append(request_id)
 
     def shutdown(self) -> None:
+        if self._shutdown_started_event is not None:
+            self._shutdown_started_event.set()
+        if self._shutdown_block_event is not None:
+            self._shutdown_block_event.wait()
         self.shutdown_calls += 1
 
 

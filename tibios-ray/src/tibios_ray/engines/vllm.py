@@ -198,7 +198,28 @@ class VllmTextBackend:
         return BackendSession(backend_id=VLLM_BACKEND_ID, session_id=session_id)
 
     async def release(self, session: BackendSession) -> None:
-        raise NotImplementedError("release() lands in task 1.8")
+        # VL13: pop under the lock and raise if absent — double release,
+        # a foreign session, or never-acquired all look identical here
+        # (idempotent-by-rejection, LC2 inherited). Popping under the
+        # lock makes a negative refcount structurally impossible: the
+        # second release() of the same session never reaches the
+        # decrement below.
+        async with self._lock:
+            entry = self._sessions.pop(session.session_id, None)
+            if entry is None:
+                raise UnknownSessionError(session.session_id)
+
+            runtime = entry.runtime
+            runtime.refcount -= 1
+            if runtime.refcount == 0:
+                # Teardown while still holding the lock (VL13): a
+                # concurrent acquire() either completes entirely before
+                # this decrement (refcount never reaches zero, no
+                # teardown) or entirely after the slot is cleared below
+                # (it constructs a fresh engine) — no interleaving in
+                # which a session borrows an engine being shut down.
+                await asyncio.to_thread(runtime.engine.shutdown)
+                self._runtime = None
 
     async def generate(
         self, session: BackendSession, request: TextRequest

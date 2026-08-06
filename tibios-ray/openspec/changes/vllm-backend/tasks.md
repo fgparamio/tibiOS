@@ -34,9 +34,9 @@ Strict TDD active (`uv run pytest`). Each numbered task is RED (failing test) th
 - [x] 1.5 RED: `supports()` True/False across BackendIds incl. plan exposing only `.backend` (VL4). GREEN: implement `supports()`.
 - [x] 1.6 RED: first/second `acquire()` reuse one engine; two models get two engines (VL2/VL3). GREEN: `_ModelRuntime` dataclass, `acquire()` construct-or-reuse + refcount increment under `self._lock` (VL5).
 - [x] 1.7 RED: concurrent-first-acquire barrier test asserting exactly one construction (VL6, highest-severity risk). GREEN: single-flight lock+double-check, no `await` between factory return and slot assignment.
-- [ ] 1.8 RED: release-last shuts down engine; release-non-last keeps it running (VL13). GREEN: `release()` pop-under-lock, decrement, teardown at zero via `asyncio.to_thread(engine.shutdown)`.
-- [ ] 1.9 RED: double-release / foreign-session raises `UnknownSessionError`, refcount unaffected (LC2 idempotent-by-rejection). GREEN: pop-then-raise ordering in `release()`.
-- [ ] 1.10 RED: teardown-vs-acquire race test — concurrent `release(last)`/`acquire()`, assert ordering invariant (VL13). No new code (falls out of 1.6-1.8's shared lock).
+- [x] 1.8 RED: release-last shuts down engine; release-non-last keeps it running (VL13). GREEN: `release()` pop-under-lock, decrement, teardown at zero via `asyncio.to_thread(engine.shutdown)`.
+- [x] 1.9 RED: double-release / foreign-session raises `UnknownSessionError`, refcount unaffected (LC2 idempotent-by-rejection). GREEN: pop-then-raise ordering in `release()`.
+- [x] 1.10 RED: teardown-vs-acquire race test — concurrent `release(last)`/`acquire()`, assert ordering invariant (VL13). No new code (falls out of 1.6-1.8's shared lock).
 - [ ] 1.11 `engines/__init__.py`: re-export `VLLM_BACKEND_ID`, `VllmTextBackend`, `AsyncLLMLike`; extend `__all__`. RED/GREEN: update `test_engines_exports.py`.
 - [ ] 1.12 Rename `test_llamacpp_layering.py` -> `test_engines_layering.py`; bump vacuity guard `>=2` -> `>=3` (scanner already covers `vllm.py`).
 - [ ] 1.13 No code task: `backend-adapter` delta (`BackendSession` residency invariant, `specs/backend-adapter/spec.md`) is spec-only — `BackendSession` already complies. Do not schedule a corresponding code change.
