@@ -239,9 +239,16 @@ class VllmTextBackend:
             runtime = entry.runtime
             # VL13/VL14: any stream this session never drained to
             # completion is stranded — finalize (abort) it explicitly
-            # rather than leaving it to the engine's GC.
-            for live_request_id, live_stream in list(entry.live.items()):
-                _schedule_finalize(runtime, live_stream, live_request_id, abort=True)
+            # rather than leaving it to the engine's GC. Popping here
+            # is the same single-owner claim `generate()`'s `finally`
+            # uses: whichever side pops the entry first is the one
+            # cleanup path (VL14) — an outer generator that later gets
+            # closed/GC'd for a request_id already popped here finds
+            # nothing and does not re-finalize it.
+            for live_request_id in list(entry.live):
+                live_stream = entry.live.pop(live_request_id, None)
+                if live_stream is not None:
+                    _schedule_finalize(runtime, live_stream, live_request_id, abort=True)
 
             runtime.refcount -= 1
             if runtime.refcount == 0:
@@ -302,8 +309,15 @@ class VllmTextBackend:
             # latter, silently skipping the abort. Schedule a
             # background task instead and let it be joined elsewhere
             # (release(), VL13).
-            entry.live.pop(request_id, None)
-            _schedule_finalize(entry.runtime, stream, request_id, abort=not completed)
+            #
+            # VL14: `entry.live.pop` doubles as a single-owner claim
+            # ticket — if `release()` already popped and finalized this
+            # request_id (the "consumer suspended and abandoned"
+            # case), this pop returns None and we must not finalize it
+            # again ("exactly one cleanup path in the design").
+            claimed = entry.live.pop(request_id, None)
+            if claimed is not None:
+                _schedule_finalize(entry.runtime, stream, request_id, abort=not completed)
 
     def _session_for(self, session: BackendSession) -> _SessionEntry:
         entry = self._sessions.get(session.session_id)
