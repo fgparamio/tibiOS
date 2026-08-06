@@ -3,7 +3,7 @@
 ## Review Workload Forecast
 
 | Field | Value |
-|---|---|
+|--------|-------|
 | Estimated changed lines | ~800-900 (root manifest ~40, primitives types+macro+tests ~350-400, 14 domain stubs ~220-260, runtime + guard ~150-200) |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
