@@ -13,6 +13,7 @@ from tibios_ray.capabilities.descriptor import (
     CapabilityFlags,
     ModelFamily,
 )
+from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
 
@@ -23,4 +24,5 @@ __all__ = [
     "CapabilityName",
     "CapabilityProvider",
     "ModelFamily",
+    "NoBackendAvailableError",
 ]
