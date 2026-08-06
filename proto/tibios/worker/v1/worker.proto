@@ -1,0 +1,241 @@
+syntax = "proto3";
+
+// Worker Contract — the proto3 wire projection of
+// docs/architecture/18-worker-model.md (tag architecture-v1.0).
+//
+// This file is a projection, never the canonical model: the Worker
+// Contract itself is defined in prose by 18-worker-model.md. Two Worker
+// implementations satisfy this same contract — `local-infer` (in-process,
+// no network hop) and `tibios-ray` (out-of-process, gRPC) — per
+// 18-worker-model.md:88 and 25-ai-runtime.md:42. Every field here passed
+// the Transport-Agnosticism Test (design.md, Governing Principle): would
+// `local-infer` still need it? If yes, it is here as a message field, not
+// as gRPC metadata.
+package tibios.worker.v1;
+
+import "tibios/primitives/v1/identity.proto";
+import "google/protobuf/duration.proto";
+
+// ResolvedModelRef — a resolved reference to the model artifact an
+// execution runs against, already resolved by the Runtime before
+// SubmitJob is called.
+// docs/architecture/18-worker-model.md — Execution Context.
+message ResolvedModelRef {
+  tibios.primitives.v1.ObjectId object_id = 1;
+  tibios.primitives.v1.ObjectVersion object_version = 2;
+  tibios.primitives.v1.ContentHash content_hash = 3;
+}
+
+// AllocationContract — the resource envelope the Allocation domain has
+// already granted for this execution.
+// docs/architecture/18-worker-model.md — Execution Context.
+message AllocationContract {
+  google.protobuf.Duration max_execution_duration = 1;
+}
+
+// SecurityContext — the execution-scoped authorization envelope under
+// which this one execution runs: the tenant/principal on whose behalf
+// the work is performed, and the scope of what this execution may touch.
+// This is deliberately NOT the peer-authentication model of
+// docs/architecture/22-networking.md; a Worker is not a Runtime peer
+// (design.md D1). It is the same category of thing 13-object-model.md:67
+// attaches to every Object ("Security Context"), never negotiated or
+// derived by the Worker.
+// docs/architecture/18-worker-model.md:52, :136.
+message SecurityContext {
+  string tenant_id = 1;
+  string principal_id = 2;
+  repeated string grant_scope = 3;
+}
+
+// ObservabilityContext — trace identifiers carried as normative message
+// fields, distinct from any transport-derived header. The gRPC client
+// interceptor MAY additionally emit a standard `traceparent` header
+// derived from these fields for off-the-shelf OTel instrumentation, but
+// that header is never authoritative: a Worker MUST NOT read transport
+// metadata to obtain contract data. If the two disagree, the message wins.
+// docs/architecture/18-worker-model.md:52 (Execution Context — Observability
+// Context); docs/architecture/09-observability.md:47; design.md D1 Consequences.
+message ObservabilityContext {
+  string trace_id = 1;
+  string span_id = 2;
+}
+
+// ExecutionContext — everything one Worker execution needs, as fields on
+// one message: Workload identity, Allocation identity, the granted
+// AllocationContract, resolved dependency references, the SecurityContext,
+// the ObservabilityContext, and Execution Parameters. There is no Channel
+// field and no CancellationToken field: on the wire, the Channel IS the
+// SubmitJob response stream, and cancellation IS the Cancel RPC — neither
+// serializes (proposal.md Approach #2).
+// docs/architecture/18-worker-model.md — Execution Context (full
+// doc-mandated set).
+message ExecutionContext {
+  tibios.primitives.v1.WorkloadId workload_id = 1;
+  tibios.primitives.v1.AllocationId allocation_id = 2;
+  AllocationContract allocation_contract = 3;
+  repeated ResolvedModelRef dependencies = 4;
+  SecurityContext security_context = 5;
+  ObservabilityContext observability_context = 6;
+  map<string, string> execution_parameters = 7;
+}
+
+// OutputChunk — one ExecutionEvent arm carrying application output data.
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message OutputChunk {
+  bytes data = 1;
+  uint64 sequence = 2;
+}
+
+// Progress — one ExecutionEvent arm reporting execution progress.
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message Progress {
+  double fraction_complete = 1;
+  string message = 2;
+}
+
+// Warning — one ExecutionEvent arm carrying a non-fatal execution warning.
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message Warning {
+  string message = 1;
+}
+
+// CheckpointCreated — one ExecutionEvent arm signaling a checkpoint was
+// created during execution.
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message CheckpointCreated {
+  tibios.primitives.v1.ObjectId checkpoint_object_id = 1;
+}
+
+// MetricsSnapshot — one ExecutionEvent arm carrying a point-in-time
+// metrics snapshot.
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message MetricsSnapshot {
+  map<string, double> metrics = 1;
+}
+
+// EndOfStream — one ExecutionEvent arm marking the end of application
+// output. This is distinct from the terminal ExecutionReport: EndOfStream
+// marks the end of *application output*; the Report terminates the
+// *execution* itself (18-worker-model.md:102 — "Execution produces
+// events. Completion produces a report."). `local-infer` has an
+// EndOfStream with no stream to close, so the two are never collapsed
+// (design.md D4 R1).
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message EndOfStream {}
+
+// ExecutionEvent — the closed six-arm union of application-output events
+// a Worker may emit during one execution. Exactly six arms, permanently;
+// no implementation may add a seventh (design.md Invariant #5).
+// docs/architecture/18-worker-model.md:94 — Execution Events.
+message ExecutionEvent {
+  oneof arm {
+    OutputChunk output_chunk = 1;
+    Progress progress = 2;
+    Warning warning = 3;
+    CheckpointCreated checkpoint_created = 4;
+    MetricsSnapshot metrics_snapshot = 5;
+    EndOfStream end_of_stream = 6;
+  }
+}
+
+// ExecutionReport — the operational summary produced when an execution
+// completes, including cancelled executions (18-worker-model.md:118 —
+// "completion remains owned by the Worker... even mid-cancellation").
+// This message NEVER carries application output; application data
+// travels only through ExecutionEvent (18-worker-model.md:100). It also
+// encodes nothing about how a failure might be resolved or reissued:
+// a Worker never knows the fault-handling strategy (18-worker-model.md:122);
+// that decision belongs to Runtime policy (design.md D4 Consequences).
+// docs/architecture/18-worker-model.md:102 — Execution Report.
+message ExecutionReport {
+  ExecutionPhase final_phase = 1;
+  google.protobuf.Duration duration = 2;
+  string trace_id = 3;
+  string summary = 4;
+}
+
+// ExecutionPhase — the phase an execution has reached, as reported by
+// ExecutionReport and ExecutionPulse.
+// docs/architecture/18-worker-model.md — Execution Report, Execution Pulse.
+enum ExecutionPhase {
+  EXECUTION_PHASE_UNSPECIFIED = 0;
+  EXECUTION_PHASE_RECEIVED = 1;
+  EXECUTION_PHASE_PREPARED = 2;
+  EXECUTION_PHASE_RUNNING = 3;
+  EXECUTION_PHASE_COMPLETED = 4;
+  EXECUTION_PHASE_FAILED = 5;
+  EXECUTION_PHASE_CANCELLED = 6;
+}
+
+// ExecutionPulse — the response to a Runtime-pulled health check for one
+// in-flight execution, correlated by WorkloadId via the Pulse RPC.
+// docs/architecture/18-worker-model.md — Execution Pulse.
+message ExecutionPulse {
+  ExecutionPhase phase = 1;
+  bool healthy = 2;
+}
+
+// ExecutionResponse — the envelope carried on the SubmitJob response
+// stream. Exactly two oneof arms, permanently: an ExecutionEvent, or the
+// terminal ExecutionReport. There is no WorkloadId field on this message:
+// the stream itself is the correlation (one SubmitJob -> one stream ->
+// one execution). Exactly one `report` arrives per stream, and it is
+// always the LAST message on the stream — including for cancelled
+// executions. proto3 cannot enforce "always last" structurally; this
+// comment and the worker-wire-contract spec scenario are the guard. An
+// unset `payload` (e.g. a newer peer sending a future third arm) is a
+// protocol error the receiver MUST reject via TryFrom, never silently
+// skip.
+// docs/architecture/18-worker-model.md:102; design.md D4.
+message ExecutionResponse {
+  oneof payload {
+    ExecutionEvent event = 1;
+    ExecutionReport report = 2;
+  }
+}
+
+// CancelRequest — a request to cancel one in-flight execution, correlated
+// solely by WorkloadId. No compound ID or issuance-count field is ever
+// encoded here.
+// docs/architecture/18-worker-model.md — Cancellation.
+message CancelRequest {
+  tibios.primitives.v1.WorkloadId workload_id = 1;
+}
+
+// PulseRequest — a request for the health of one in-flight execution,
+// correlated solely by WorkloadId.
+// docs/architecture/18-worker-model.md — Execution Pulse.
+message PulseRequest {
+  tibios.primitives.v1.WorkloadId workload_id = 1;
+}
+
+// CancelAck — the response to a Cancel RPC. It means "cancellation
+// request accepted", and NEVER means "execution terminated": completion
+// remains Worker-owned and is observed only on the SubmitJob response
+// stream, as final events, EndOfStream, and the ExecutionReport
+// (18-worker-model.md:118). Deliberately a named message, not
+// google.protobuf.Empty, so it stays evolvable.
+// docs/architecture/18-worker-model.md — Cancellation; design.md D4 R3.
+message CancelAck {}
+
+// WorkerExecution — the Worker Contract's gRPC surface. Exactly three
+// RPCs, permanently: SubmitJob, Cancel, Pulse. No fourth RPC exists; the
+// ExecutionReport rides the SubmitJob response stream rather than a
+// separate RPC (design.md D4).
+// docs/architecture/18-worker-model.md — the Worker Contract.
+service WorkerExecution {
+  // SubmitJob — starts one execution. The response stream carries
+  // ExecutionEvent messages followed by exactly one terminal
+  // ExecutionReport, always last.
+  rpc SubmitJob(ExecutionContext) returns (stream ExecutionResponse);
+
+  // Cancel — cooperatively requests cancellation of one in-flight
+  // execution, correlated by WorkloadId. Returns CancelAck: accepted,
+  // not terminated.
+  rpc Cancel(CancelRequest) returns (CancelAck);
+
+  // Pulse — a Runtime-pulled health check for one in-flight execution,
+  // correlated by WorkloadId.
+  rpc Pulse(PulseRequest) returns (ExecutionPulse);
+}

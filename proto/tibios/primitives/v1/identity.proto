@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+// Runtime Primitives — identity wrappers used across every Runtime domain.
+//
+// This file is deliberately service-free: it exists so that other proto
+// projections (this Worker contract, and future ones such as the Runtime
+// API projection) can depend on a single, versioned source of identity
+// types without depending on each other's domain language.
+//
+// Ownership: these primitives are produced by `runtime-primitives`
+// (docs/architecture/02-project-structure.md:116), not by the Worker
+// domain. `worker.proto` imports this file; this file imports nothing.
+package tibios.primitives.v1;
+
+// ObjectId — the identity component of every Object in the Object Model.
+// docs/architecture/02-project-structure.md:116 (Runtime Primitives).
+message ObjectId {
+  string value = 1;
+}
+
+// ObjectVersion — the version component attached to an Object's identity,
+// used for optimistic concurrency and lineage tracking.
+// docs/architecture/02-project-structure.md:116 (Runtime Primitives).
+message ObjectVersion {
+  string value = 1;
+}
+
+// ContentHash — a content-addressable digest used to verify object
+// content integrity across the wire and across storage.
+// docs/architecture/02-project-structure.md:116 (Runtime Primitives).
+message ContentHash {
+  string value = 1;
+}
+
+// WorkloadId — the identity of one Execution Context / one SubmitJob
+// stream. It is the sole correlation key for the Cancel and Pulse RPCs
+// in the Worker contract (docs/architecture/18-worker-model.md — Execution
+// Context, Cancellation, Execution Pulse); the primitive itself is
+// enumerated at docs/architecture/02-project-structure.md:116.
+message WorkloadId {
+  string value = 1;
+}
+
+// AllocationId — the identity of one Allocation. Deliberately its own
+// Runtime Primitive, never `ObjectId`: an Allocation carries mutable
+// Runtime State, so per `13-object-model.md` it cannot be
+// content-addressed the way an Object is. Enumerated as its own primitive
+// at docs/architecture/02-project-structure.md:116; the shape (a
+// ULID-valued identity, separate from ObjectId) is set at
+// docs/architecture/15-allocation-model.md:41 — "Every Allocation owns an
+// AllocationId... a ResourceId, a WorkloadId, and an owner."
+message AllocationId {
+  string value = 1;
+}
