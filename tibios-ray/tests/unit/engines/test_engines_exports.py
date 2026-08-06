@@ -12,3 +12,10 @@ def test_package_exports_all_slice_1_public_names() -> None:
     assert expected <= set(engines.__all__)
     for name in expected:
         assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"
+
+
+def test_package_exports_vllm_backend_public_names() -> None:
+    expected = {"VLLM_BACKEND_ID", "VllmTextBackend", "AsyncLLMLike"}
+    assert expected <= set(engines.__all__)
+    for name in expected:
+        assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"

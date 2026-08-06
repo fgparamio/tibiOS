@@ -37,9 +37,9 @@ Strict TDD active (`uv run pytest`). Each numbered task is RED (failing test) th
 - [x] 1.8 RED: release-last shuts down engine; release-non-last keeps it running (VL13). GREEN: `release()` pop-under-lock, decrement, teardown at zero via `asyncio.to_thread(engine.shutdown)`.
 - [x] 1.9 RED: double-release / foreign-session raises `UnknownSessionError`, refcount unaffected (LC2 idempotent-by-rejection). GREEN: pop-then-raise ordering in `release()`.
 - [x] 1.10 RED: teardown-vs-acquire race test — concurrent `release(last)`/`acquire()`, assert ordering invariant (VL13). No new code (falls out of 1.6-1.8's shared lock).
-- [ ] 1.11 `engines/__init__.py`: re-export `VLLM_BACKEND_ID`, `VllmTextBackend`, `AsyncLLMLike`; extend `__all__`. RED/GREEN: update `test_engines_exports.py`.
-- [ ] 1.12 Rename `test_llamacpp_layering.py` -> `test_engines_layering.py`; bump vacuity guard `>=2` -> `>=3` (scanner already covers `vllm.py`).
-- [ ] 1.13 No code task: `backend-adapter` delta (`BackendSession` residency invariant, `specs/backend-adapter/spec.md`) is spec-only — `BackendSession` already complies. Do not schedule a corresponding code change.
+- [x] 1.11 `engines/__init__.py`: re-export `VLLM_BACKEND_ID`, `VllmTextBackend`, `AsyncLLMLike`; extend `__all__`. RED/GREEN: update `test_engines_exports.py`.
+- [x] 1.12 Rename `test_llamacpp_layering.py` -> `test_engines_layering.py`; bump vacuity guard `>=2` -> `>=3` (scanner already covers `vllm.py`).
+- [x] 1.13 No code task: `backend-adapter` delta (`BackendSession` residency invariant, `specs/backend-adapter/spec.md`) is spec-only — `BackendSession` already complies. Do not schedule a corresponding code change.
 - [ ] 1.14 Local verification: `uv run pytest && uv run ruff check && uv run pyright` green for slice 1 (no CI configured — local gate only).
 
 ## PR 2 — Streaming + Cancellation
