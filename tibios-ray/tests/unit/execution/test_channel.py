@@ -3,41 +3,22 @@ and `CancellationToken` (cooperative cancellation, design decision D5).
 
 Both are `typing.Protocol`s (structural contracts, no base class per design
 decision D1) — tests exercise conforming fakes rather than the Protocol
-classes themselves.
+classes themselves. Fakes come from `tibios_ray.testing` (Phase 6) — this
+module is their origin (`RecordingChannel`/`ManualCancellation` were first
+hand-rolled here), now deduped to the shared `InMemoryExecutionChannel`/
+`ManualCancellation`.
 """
 
 import asyncio
 
 from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
-from tibios_ray.execution.events import EndOfStream, ExecutionEvent, OutputChunk
-
-
-class RecordingChannel:
-    def __init__(self) -> None:
-        self.emitted: list[ExecutionEvent] = []
-
-    async def emit(self, event: ExecutionEvent) -> None:
-        self.emitted.append(event)
-
-
-class ManualCancellation:
-    def __init__(self) -> None:
-        self._event = asyncio.Event()
-
-    @property
-    def is_cancelled(self) -> bool:
-        return self._event.is_set()
-
-    async def wait(self) -> None:
-        await self._event.wait()
-
-    def cancel(self) -> None:
-        self._event.set()
+from tibios_ray.execution.events import EndOfStream, OutputChunk
+from tibios_ray.testing import InMemoryExecutionChannel, ManualCancellation
 
 
 def test_recording_channel_satisfies_execution_channel_protocol() -> None:
-    channel: ExecutionChannel = RecordingChannel()
-    assert isinstance(channel, RecordingChannel)
+    channel: ExecutionChannel = InMemoryExecutionChannel()
+    assert isinstance(channel, InMemoryExecutionChannel)
 
 
 def test_manual_cancellation_satisfies_cancellation_token_protocol() -> None:
@@ -46,8 +27,8 @@ def test_manual_cancellation_satisfies_cancellation_token_protocol() -> None:
 
 
 def test_channel_emit_is_write_only_and_records_events() -> None:
-    async def scenario() -> RecordingChannel:
-        channel = RecordingChannel()
+    async def scenario() -> InMemoryExecutionChannel:
+        channel = InMemoryExecutionChannel()
         await channel.emit(OutputChunk(data=b"hi", sequence=0))
         await channel.emit(EndOfStream())
         return channel

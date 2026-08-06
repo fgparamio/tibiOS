@@ -15,13 +15,9 @@ from datetime import timedelta
 import pytest
 
 from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
-from tibios_ray.execution.context import (
-    AllocationContract,
-    ExecutionContext,
-    ResolvedModelRef,
-)
-from tibios_ray.execution.events import ExecutionEvent
+from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.ids import ContentHash, ObjectId, ObjectVersion
+from tibios_ray.testing import FakeExecutionContext
 
 
 def _resolved_model_ref() -> ResolvedModelRef:
@@ -41,20 +37,6 @@ def _allocation_contract() -> AllocationContract:
         checkpoint_required=False,
         max_execution_duration=timedelta(minutes=30),
     )
-
-
-class _FakeChannel:
-    async def emit(self, event: ExecutionEvent) -> None:  # pragma: no cover - unused
-        raise NotImplementedError
-
-
-class _FakeCancellation:
-    @property
-    def is_cancelled(self) -> bool:
-        return False
-
-    async def wait(self) -> None:  # pragma: no cover - unused
-        raise NotImplementedError
 
 
 class TestResolvedModelRef:
@@ -89,12 +71,10 @@ class TestResolvedModelRef:
 
     def test_only_legitimate_source_is_execution_context_dependencies(self) -> None:
         ref = _resolved_model_ref()
-        ctx = ExecutionContext(
+        ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
             dependencies={"model": ref},
-            channel=_FakeChannel(),
-            cancellation=_FakeCancellation(),
         )
         assert ctx.dependencies["model"] is ref
         assert isinstance(ctx.dependencies["model"], ResolvedModelRef)
@@ -115,34 +95,26 @@ class TestAllocationContract:
 class TestExecutionContext:
     def test_holds_capability_and_dependencies(self) -> None:
         ref = _resolved_model_ref()
-        ctx = ExecutionContext(
+        ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
             dependencies={"model": ref},
-            channel=_FakeChannel(),
-            cancellation=_FakeCancellation(),
         )
         assert ctx.capability == "chat.generate"
         assert ctx.dependencies == {"model": ref}
 
     def test_is_frozen(self) -> None:
-        ctx = ExecutionContext(
+        ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
-            dependencies={},
-            channel=_FakeChannel(),
-            cancellation=_FakeCancellation(),
         )
         with pytest.raises(dataclasses.FrozenInstanceError):
             ctx.capability = "embed"  # type: ignore[misc]
 
     def test_channel_and_cancellation_satisfy_their_protocols(self) -> None:
-        ctx = ExecutionContext(
+        ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
-            dependencies={},
-            channel=_FakeChannel(),
-            cancellation=_FakeCancellation(),
         )
         channel: ExecutionChannel = ctx.channel
         cancellation: CancellationToken = ctx.cancellation

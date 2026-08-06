@@ -1,6 +1,10 @@
 """Tests for `tibios_ray.backends.adapter` — `BackendId`, `BackendSession`,
 and the `BackendAdapter` Protocol (design decision D4: model residency
 only, no unified `infer()`).
+
+`RecordingBackend` (`tibios_ray.testing`, Phase 6) is the shared fake this
+module's `FakeBackendAdapter` was consolidated into — this module is its
+origin.
 """
 
 import asyncio
@@ -12,8 +16,8 @@ from tibios_ray.backends.adapter import (
     BackendAdapter,
     BackendId,
     BackendSession,
-    ServingPlanLike,
 )
+from tibios_ray.testing import RecordingBackend
 
 
 class TestBackendId:
@@ -51,38 +55,19 @@ class _FakeServingPlan:
         self.backend = backend
 
 
-class FakeBackendAdapter:
-    def __init__(self, backend_id: BackendId) -> None:
-        self._backend_id = backend_id
-        self.released: list[BackendSession] = []
-
-    @property
-    def backend_id(self) -> BackendId:
-        return self._backend_id
-
-    def supports(self, plan: ServingPlanLike) -> bool:
-        return plan.backend == self._backend_id
-
-    async def acquire(self, plan: ServingPlanLike) -> BackendSession:
-        return BackendSession(backend_id=plan.backend, session_id="sess-acquired")
-
-    async def release(self, session: BackendSession) -> None:
-        self.released.append(session)
-
-
 def test_fake_backend_adapter_satisfies_the_protocol() -> None:
-    adapter: BackendAdapter = FakeBackendAdapter(BackendId("llama_cpp"))
+    adapter: BackendAdapter = RecordingBackend(BackendId("llama_cpp"))
     assert adapter.backend_id == BackendId("llama_cpp")
 
 
 def test_supports_returns_true_for_matching_backend_and_false_otherwise() -> None:
-    adapter = FakeBackendAdapter(BackendId("llama_cpp"))
+    adapter = RecordingBackend(BackendId("llama_cpp"))
     assert adapter.supports(_FakeServingPlan(BackendId("llama_cpp"))) is True
     assert adapter.supports(_FakeServingPlan(BackendId("vllm"))) is False
 
 
 def test_acquire_then_release_round_trips_a_session() -> None:
-    adapter = FakeBackendAdapter(BackendId("onnxruntime"))
+    adapter = RecordingBackend(BackendId("onnxruntime"))
 
     async def scenario() -> None:
         session = await adapter.acquire(_FakeServingPlan(BackendId("onnxruntime")))
