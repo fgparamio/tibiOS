@@ -45,9 +45,9 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: backends/ contract (PR 2)
 
-- [ ] 2.1 `adapter.py`: `BackendAdapter` Protocol (backend_id, supports, acquire, release), `BackendId`, `BackendSession` (D4)
-- [ ] 2.2 `text.py`/`embedding.py`/`rerank.py`/`speech.py`: per-modality execution Protocols
-- [ ] 2.3 `tests/unit/backends/` + `assert_type` conformance: no llama.cpp/TensorRT-LLM/vLLM/ONNX/Faster-Whisper imports
+- [x] 2.1 `adapter.py`: `BackendAdapter` Protocol (backend_id, supports, acquire, release), `BackendId`, `BackendSession` (D4) — done 2026-08-06
+- [x] 2.2 `text.py`/`embedding.py`/`rerank.py`/`speech.py`: per-modality execution Protocols — done 2026-08-06
+- [x] 2.3 `tests/unit/backends/` + `assert_type` conformance: no llama.cpp/TensorRT-LLM/vLLM/ONNX/Faster-Whisper imports — done 2026-08-06, 39/39 new tests passing (86/86 total), ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
 
 ## Phase 3: selection/ policy (PR 3)
 
