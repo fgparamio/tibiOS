@@ -1,0 +1,13 @@
+[package]
+name = "runtime-replication"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+runtime-primitives = { workspace = true }
+runtime-object = { workspace = true }
+runtime-storage = { workspace = true }
