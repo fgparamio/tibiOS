@@ -7,6 +7,7 @@ block, design decision D2). This package depends on ``execution/`` (for
 reverse.
 """
 
+from tibios_ray.capabilities.chat import ChatProvider
 from tibios_ray.capabilities.descriptor import (
     CapabilityCatalog,
     CapabilityDescriptor,
@@ -23,6 +24,7 @@ __all__ = [
     "CapabilityFlags",
     "CapabilityName",
     "CapabilityProvider",
+    "ChatProvider",
     "ModelFamily",
     "NoBackendAvailableError",
 ]

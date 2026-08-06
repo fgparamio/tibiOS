@@ -37,13 +37,13 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 1.3 Update `src/tibios_ray/capabilities/__init__.py` to export `NoBackendAvailableError`; verify `test_capabilities_exports.py` stays green
 - [x] 1.4 Verify: `uv run pytest && uv run ruff check && uv run pyright` from `tibios-ray/`
 
-## Slice 2 — Conformance harness + Chat Provider (PR 2)
+## Slice 2 — Conformance harness + Chat Provider (PR 2) — COMPLETE
 
-- [ ] 2.1 RED: `tests/unit/capabilities/test_provider_conformance.py` with `_PROVIDERS: tuple[CapabilityProvider, ...] = (ChatProvider(),)` and all per-Provider parametrized checks from design's Testing Strategy table (stable descriptor identity, constant naming, non-empty catalog, element typing, FLC regex, backend-id shape, `execute()` always raises for 3 context variants, error payload, no report, end-to-end through `WorkerRuntime`)
-- [ ] 2.2 RED: `tests/unit/capabilities/test_chat.py` — full `descriptor == CapabilityDescriptor(...)` equality + flag values (spec: Descriptor Catalog Correctness, "Chat advertises realistic flags")
-- [ ] 2.3 GREEN: create `src/tibios_ray/capabilities/chat.py` with `CHAT_GENERATE_DESCRIPTOR` (families: qwen, llama, deepseek, gemma, mistral, kimi; backends: llama_cpp, tensorrt_llm, vllm; flags: streaming/tools/json/reasoning all True) and `ChatProvider` per design's reference shape
-- [ ] 2.4 Update `capabilities/__init__.py` to export `ChatProvider`
-- [ ] 2.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
+- [x] 2.1 RED: `tests/unit/capabilities/test_provider_conformance.py` with `_PROVIDERS: tuple[CapabilityProvider, ...] = (ChatProvider(),)` and all per-Provider parametrized checks from design's Testing Strategy table (stable descriptor identity, constant naming, non-empty catalog, element typing, FLC regex, backend-id shape, `execute()` always raises for 3 context variants, error payload, no report, end-to-end through `WorkerRuntime`)
+- [x] 2.2 RED: `tests/unit/capabilities/test_chat.py` — full `descriptor == CapabilityDescriptor(...)` equality + flag values (spec: Descriptor Catalog Correctness, "Chat advertises realistic flags")
+- [x] 2.3 GREEN: create `src/tibios_ray/capabilities/chat.py` with `CHAT_GENERATE_DESCRIPTOR` (families: qwen, llama, deepseek, gemma, mistral, kimi; backends: llama_cpp, tensorrt_llm, vllm; flags: streaming/tools/json/reasoning all True) and `ChatProvider` per design's reference shape
+- [x] 2.4 Update `capabilities/__init__.py` to export `ChatProvider`
+- [x] 2.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
 ## Slice 3 — Embedding Provider + whole-catalog harness (PR 3)
 
