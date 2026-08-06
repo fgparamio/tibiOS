@@ -181,7 +181,21 @@ class VllmTextBackend:
         return plan.backend == VLLM_BACKEND_ID
 
     async def acquire(self, plan: ServingPlanLike) -> BackendSession:
-        raise NotImplementedError("acquire() lands in task 1.6")
+        # VL5/VL6: the entire residency state machine — construct-or-
+        # reuse, refcount increment — runs under self._lock, and there
+        # is no `await` between the factory returning and the slot
+        # assignment, so construction is atomic w.r.t. cancellation.
+        async with self._lock:
+            runtime = self._runtime
+            if runtime is None:
+                engine = await self._engine_factory(self._model)
+                runtime = _ModelRuntime(engine=engine)
+                self._runtime = runtime
+            runtime.refcount += 1
+
+        session_id = _new_session_id()
+        self._sessions[session_id] = _SessionEntry(runtime=runtime)
+        return BackendSession(backend_id=VLLM_BACKEND_ID, session_id=session_id)
 
     async def release(self, session: BackendSession) -> None:
         raise NotImplementedError("release() lands in task 1.8")
