@@ -183,7 +183,7 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
+                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=806
                     ),
                     BackendSupport(
                         backend=_VLLM,
@@ -193,7 +193,7 @@ class TestStabilityAssertions:
                     BackendSupport(
                         backend=_TENSORRT_LLM,
                         quantizations=frozenset({_FP8}),
-                        min_vram_gb=805,
+                        min_vram_gb=806,
                     ),
                 }
             ),
