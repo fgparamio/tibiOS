@@ -66,13 +66,13 @@ Chain strategy: stacked-to-main
 - **`ExecutionMetrics`** (referenced in `design.md`'s Key Contracts but never defined anywhere): resolved as the already-existing `ExecutionReport` — see `capabilities/provider.py`'s module docstring for full reasoning. No new type added to `execution/`; Phase 1 was not reopened.
 - **`ModelFamily`** (referenced in `design.md`'s `CapabilityDescriptor.families: frozenset[ModelFamily]` but never defined anywhere): defined as a small frozen, slotted dataclass in `capabilities/descriptor.py`, shaped like `backends/adapter.py`'s `BackendId` (single opaque `value: str`) — outward catalog metadata only, per `design.md`'s own boundary rule that family strings never enter the inward execution path.
 
-## Phase 5: runtime/ lifecycle host (PR 5)
+## Phase 5: runtime/ lifecycle host (PR 5) — COMPLETE 2026-08-06
 
-- [ ] 5.1 `registry.py`: `CapabilityRegistry` (immutable, ctor-built, duplicate capability -> error, `resolve()`, `catalog()`)
-- [ ] 5.2 `worker_runtime.py`: `WorkerRuntime.execute(ctx) -> ExecutionReport`, dispatch only via registry
-- [ ] 5.3 `errors.py`: Worker Contract-conformant error types
-- [ ] 5.4 `tests/unit/runtime/`: success lifecycle, unknown capability -> Failed report (no exception), cancellation -> ack+cleanup+final events+report, duplicate-capability rejection, aggregated catalog
-- [ ] 5.5 Naming audit test: grep `runtime/`, `selection/`, `backends/`, `capabilities/` for "Worker" -> zero matches
+- [x] 5.1 `registry.py`: `CapabilityRegistry` (immutable, ctor-built, duplicate capability -> error, empty-catalog provider -> error, `resolve()`, `catalog()`) — done
+- [x] 5.2 `worker_runtime.py`: `WorkerRuntime.execute(ctx) -> ExecutionReport`, dispatch only via registry — done, cooperative cancellation (D5), never lets a Provider exception escape, always emits terminal `EndOfStream`
+- [x] 5.3 `errors.py`: Worker Contract-conformant error types (`DispatchError`/`UnknownCapabilityError`, `RegistrationError`/`DuplicateCapabilityError`/`EmptyCatalogError`) — done
+- [x] 5.4 `tests/unit/runtime/`: success lifecycle, unknown capability -> Failed report (no exception), malformed capability string -> Failed report (no exception), cancellation -> ack+cleanup+final events+report, duplicate-capability rejection, empty-catalog rejection, aggregated catalog — done 2026-08-06, 17/17 new tests passing (152/152 total), ruff+pyright clean
+- [x] 5.5 Naming audit test (`tests/unit/runtime/test_naming_audit.py`, AST-identifier based, permanent): `capabilities/`, `selection/`, `backends/` zero "Worker" identifiers; `runtime/` exempt only for `WorkerRuntime` — done, mutation-verified (temporarily injected a `Worker`-named identifier, confirmed the test fails, reverted, confirmed green again)
 
 ## Phase 6: testing/ shared fakes (PR 6)
 
