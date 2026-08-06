@@ -53,7 +53,7 @@ Each task = `Cargo.toml` (allowed deps only) + `src/lib.rs` doc stub; satisfies 
 - [x] 3.11 `runtime-worker` — deps: primitives, allocation, object; cites `18`.
 - [x] 3.12 `runtime-admission` — deps: primitives, state; cites `20`.
 - [x] 3.13 `runtime-api` — deps: primitives, admission, object, state, allocation, storage, network; cites `26`.
-- [ ] 3.14 `runtime-federation` — deps: primitives, network, replication, api; cites `31`.
+- [x] 3.14 `runtime-federation` — deps: primitives, network, replication, api; cites `31`.
 
 ## Phase 4: Composition Root + Architecture Guard (TDD)
 
