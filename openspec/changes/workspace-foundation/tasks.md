@@ -46,8 +46,8 @@ Each task = `Cargo.toml` (allowed deps only) + `src/lib.rs` doc stub; satisfies 
 - [x] 3.4 `runtime-security` — dep: primitives; cites `08`.
 - [x] 3.5 `runtime-observability` — dep: primitives; cites `09`.
 - [x] 3.6 `runtime-deployment` — dep: primitives ONLY; cites `29`.
-- [ ] 3.7 `runtime-scheduler` — deps: primitives, object; cites `14`,`16`.
-- [ ] 3.8 `runtime-state` — deps: primitives, object, scheduler, network; cites `17`,`19`; doc-note network edge is data-contract-only (Runtime Events, never Transport/Session).
+- [x] 3.7 `runtime-scheduler` — deps: primitives, object; cites `14`,`16`.
+- [x] 3.8 `runtime-state` — deps: primitives, object, scheduler, network; cites `17`,`19`; doc-note network edge is data-contract-only (Runtime Events, never Transport/Session).
 - [ ] 3.9 `runtime-allocation` — deps: primitives, scheduler, object; cites `15`.
 - [ ] 3.10 `runtime-replication` — deps: primitives, object, storage; cites `24`.
 - [ ] 3.11 `runtime-worker` — deps: primitives, allocation, object; cites `18`.
