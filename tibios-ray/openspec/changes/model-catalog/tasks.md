@@ -117,12 +117,12 @@ both resolution-type guards + pyright fixture, ~359 changed lines).
 - [x] 6.2 `tests/unit/catalog/test_vision_entries.py`: RED-first — local `ModelCatalog(VISION_ENTRIES)` fixture, family coverage for `qwen_vl`/`llama_vision`, one full-equality stability assertion per family, derivation round-trip
 - [x] 6.3 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
-## Phase 7: speech + OCR (PR 7)
+## Phase 7: speech + OCR (PR 7) — COMPLETE
 
-- [ ] 7.1 `catalog/entries/speech.py`: `whisper` (`openai/whisper-large-v3`, `openai/whisper-large-v3-turbo`), `kokoro` (`hexgrad/Kokoro-82M`)
-- [ ] 7.2 `catalog/entries/ocr.py`: `paddleocr` (`PaddlePaddle/PaddleOCR`)
-- [ ] 7.3 `tests/unit/catalog/test_speech_entries.py` + `tests/unit/catalog/test_ocr_entries.py`: RED-first — local `ModelCatalog` fixtures, family coverage, one full-equality stability assertion per family, derivation round-trip
-- [ ] 7.4 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
+- [x] 7.1 `catalog/entries/speech.py`: `whisper` (`openai/whisper-large-v3`, `openai/whisper-large-v3-turbo`), `kokoro` (`hexgrad/Kokoro-82M`). Note: `design.md`'s worked Reference data table does **not** cover `whisper`/`kokoro` (only names, line 400) — figures were derived from MC13's formula using the decimal-GB interpretation established in slice 5, not copied verbatim (verified directly against design.md before writing any code, not assumed from slice 6's situation).
+- [x] 7.2 `catalog/entries/ocr.py`: `paddleocr` (`PaddlePaddle/PaddleOCR`) — same derive situation as 7.1.
+- [x] 7.3 `tests/unit/catalog/test_speech_entries.py` + `tests/unit/catalog/test_ocr_entries.py`: RED-first — local `ModelCatalog` fixtures, family coverage, one full-equality stability assertion per family, derivation round-trip
+- [x] 7.4 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
 ## Phase 8: assembly + consistency (PR 8)
 
