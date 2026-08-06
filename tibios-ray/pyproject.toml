@@ -3,7 +3,7 @@ name = "tibios-ray"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "grpcio>=1.83.0",
     "protobuf>=7.35.1",
@@ -19,14 +19,7 @@ llamacpp = ["llama-cpp-python>=0.3.34,<0.4"]
 # llamacpp's extra above (design.md "Risks"). The unit test tier must
 # never require this extra to be installed (`engines/vllm.py`'s lazy
 # `importlib` seam, design decision VL8/LC11).
-# `python_version < '3.14'` marker: vllm's pinned torch==2.7.0 currently
-# ships no cp314 wheel, and `requires-python = ">=3.14"` is project-wide
-# — without this marker, `uv lock`/`uv sync`/`uv run` fail to resolve
-# for *everyone*, including the SDK-free unit tier that never touches
-# vllm at all. Revisit (drop the marker) once upstream torch/vllm ship
-# a cp314 build; a real GPU install today targets a <3.14 interpreter
-# for this extra specifically.
-vllm = ["vllm>=0.9.0,<0.10; python_version < '3.14'"]
+vllm = ["vllm>=0.9.0,<0.10"]
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
@@ -52,5 +45,5 @@ select = ["E", "F", "I"]
 include = ["src", "tests"]
 exclude = ["src/tibios_ray/transport/_generated"]
 typeCheckingMode = "standard"
-pythonVersion = "3.14"
+pythonVersion = "3.13"
 reportUnnecessaryTypeIgnoreComment = true
