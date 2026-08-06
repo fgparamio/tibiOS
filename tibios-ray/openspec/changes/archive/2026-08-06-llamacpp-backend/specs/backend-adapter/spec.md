@@ -1,10 +1,6 @@
-# Backend Adapter Specification
+# Delta for Backend Adapter
 
-## Purpose
-
-The Backend Adapter is the engine-agnostic contract Capability Providers execute against, decoupling them from concrete inference engines. The contract is defined as a protocol/ABC expressing execution in terms independent of any specific engine (llama.cpp, TensorRT-LLM, vLLM, ONNX Runtime, Faster-Whisper). Concrete backend implementations live exclusively outside the `backends/` tree, in separate engine packages (e.g., `engines/`), maintaining the structural boundary.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Backend Adapter Contract Is Engine-Agnostic
 
@@ -29,13 +25,3 @@ The `backends/` package tree MUST express execution in terms independent of any 
 - GIVEN a hypothetical concrete adapter placed at `backends/engines/rogue.py`, nested under the contract tree
 - WHEN the engine-SDK import guard test runs
 - THEN it discovers and scans that nested file too (recursive traversal, not a top-level-only glob), failing the test if it imports a forbidden SDK
-
-### Requirement: Capability Providers Depend on the Contract, Not the Engine
-
-Capability Provider implementations MUST depend exclusively on the Backend Adapter contract type. They MUST NOT import or reference a specific engine's SDK or types directly.
-
-#### Scenario: Dependency direction is Provider → Adapter, never reversed
-
-- GIVEN the Phase 1 module dependency graph
-- WHEN traced from any Capability Provider module
-- THEN it depends only on the Backend Adapter contract module, and the Backend Adapter module has no dependency back on any Capability Provider
