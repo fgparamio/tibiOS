@@ -59,14 +59,10 @@ class TestModelDescriptorShape:
             descriptor.parameter_count = 1  # type: ignore[misc]
 
     def test_is_kw_only_not_positional(self) -> None:
+        name = PublishedModelName("Qwen/Qwen3-8B")
+        family = ModelFamily("qwen")
         with pytest.raises(TypeError):
-            ModelDescriptor(  # type: ignore[misc]
-                PublishedModelName("Qwen/Qwen3-8B"),
-                ModelFamily("qwen"),
-                8_200_000_000,
-                32_768,
-                frozenset(),
-            )
+            ModelDescriptor(name, family, 8_200_000_000, 32_768, frozenset())  # type: ignore[call-arg]
 
 
 def _two_tier_descriptor() -> ModelDescriptor:

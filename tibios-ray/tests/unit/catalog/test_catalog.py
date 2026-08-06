@@ -65,7 +65,11 @@ def _llama_entry() -> ModelDescriptor:
         parameter_count=8_030_000_000,
         context_window=131_072,
         serving=frozenset(
-            {BackendSupport(backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5)}
+            {
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5
+                )
+            }
         ),
     )
 
