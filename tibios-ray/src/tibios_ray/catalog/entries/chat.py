@@ -215,13 +215,13 @@ DEEPSEEK_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=806
                 ),
                 BackendSupport(
                     backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=403
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=805
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=806
                 ),
             }
         ),
@@ -237,10 +237,10 @@ DEEPSEEK_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=806
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=805
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=806
                 ),
             }
         ),
