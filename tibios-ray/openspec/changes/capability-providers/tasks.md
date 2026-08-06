@@ -62,13 +62,13 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 4.4 Update `capabilities/__init__.py` to export `RerankProvider`
 - [x] 4.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
-## Slice 5 — Vision Provider (PR 5)
+## Slice 5 — Vision Provider (PR 5) — COMPLETE
 
-- [ ] 5.1 RED: `tests/unit/capabilities/test_vision.py` — descriptor equality with families `qwen_vl`, `llama_vision`, `gemma` (NOT `gemma_vision` — FLC deviation CP5); backends `vllm`, `tensorrt_llm`; flags streaming+json only
-- [ ] 5.2 GREEN: create `src/tibios_ray/capabilities/vision.py` with `VISION_UNDERSTAND_DESCRIPTOR` and `VisionProvider`
-- [ ] 5.3 Append `VisionProvider()` to `_PROVIDERS` tuple
-- [ ] 5.4 Update `capabilities/__init__.py` to export `VisionProvider`
-- [ ] 5.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
+- [x] 5.1 RED: `tests/unit/capabilities/test_vision.py` — descriptor equality with families `qwen_vl`, `llama_vision`, `gemma` (NOT `gemma_vision` — FLC deviation CP5); backends `vllm`, `tensorrt_llm`; flags streaming+json only
+- [x] 5.2 GREEN: create `src/tibios_ray/capabilities/vision.py` with `VISION_UNDERSTAND_DESCRIPTOR` and `VisionProvider`
+- [x] 5.3 Append `VisionProvider()` to `_PROVIDERS` tuple
+- [x] 5.4 Update `capabilities/__init__.py` to export `VisionProvider`
+- [x] 5.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
 ## Slice 6 — Speech Providers (transcribe + synthesize) (PR 6)
 

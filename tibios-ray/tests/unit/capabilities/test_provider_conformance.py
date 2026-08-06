@@ -27,6 +27,7 @@ from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
 from tibios_ray.capabilities.rerank import RerankProvider
+from tibios_ray.capabilities.vision import VisionProvider
 from tibios_ray.execution.context import ExecutionContext
 from tibios_ray.execution.events import EndOfStream
 from tibios_ray.execution.report import ExecutionPhase
@@ -38,6 +39,7 @@ _PROVIDERS: tuple[CapabilityProvider, ...] = (
     ChatProvider(),
     EmbeddingProvider(),
     RerankProvider(),
+    VisionProvider(),
 )
 
 # Family Label Convention (FLC, design.md CP5): lowercase, `_`-separated,
