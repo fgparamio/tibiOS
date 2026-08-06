@@ -4,7 +4,7 @@ Version: 1.0
 
 ## Purpose
 
-Deployment answers exactly one question: **should a Runtime instance exist, with what configuration, and for how long?** It is not Scheduling (`16`), not Orchestration of Workloads, not Replication (`24`), and not Networking (`22`) — those all operate *inside* a running Runtime. Deployment operates *outside* it.
+Deployment answers exactly one question: **should a Runtime instance exist, with what configuration, and for how long?** It is not Scheduling (`16-scheduling-engine.md`), not Orchestration of Workloads, not Replication (`24-replication.md`), and not Networking (`22-networking.md`) — those all operate *inside* a running Runtime. Deployment operates *outside* it.
 
 Deployment does not know Kubernetes, Docker, Helm, or systemd. Those are technologies that may implement Deployment's decisions, exactly as REST and gRPC implement the Runtime API's capabilities (`26-runtime-api.md`) — the model stays identical whether a Runtime instance is a container, a bare-metal process, or an embedded device.
 
@@ -32,7 +32,7 @@ Runtime (02-project-structure.md)
 
 ## Ownership
 
-Deployment owns its own crate, `runtime-deployment`. Unlike projection documents (`25`, `27`, `28`), Deployment introduces new architectural concepts with their own lifecycle and therefore requires its own domain.
+Deployment owns its own crate, `runtime-deployment`. Unlike projection documents (`25-ai-runtime.md`, `27-sdk.md`, `28-cli.md`), Deployment introduces new architectural concepts with their own lifecycle and therefore requires its own domain.
 
 Deployment owns the lifecycle of a Runtime instance. It does not own the Runtime itself — `02-project-structure.md`'s Composition Root remains the sole authority over how a Runtime instance wires itself internally once it exists.
 

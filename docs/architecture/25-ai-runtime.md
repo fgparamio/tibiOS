@@ -6,7 +6,7 @@ Version: 1.0
 
 The AI Runtime is not a second Runtime. It answers exactly one architectural question: **how does AI workload execution use TibiOS's general infrastructure without creating parallel mechanisms?**
 
-The AI Runtime introduces no new architectural primitives. It composes the Runtime's existing primitives — Object (`13`), Resource (`14`), Scheduling (`16`), Allocation (`15`), Worker (`18`), Object Store (`23`), Replication (`24`) — to execute AI workloads. Every question this document answers has already been answered generically; this document only shows where AI concepts map onto that existing answer.
+The AI Runtime introduces no new architectural primitives. It composes the Runtime's existing primitives — Object (`13-object-model.md`), Resource (`14-resource-model.md`), Scheduling (`16-scheduling-engine.md`), Allocation (`15-allocation-model.md`), Worker (`18-worker-model.md`), Object Store (`23-object-store.md`), Replication (`24-replication.md`) — to execute AI workloads. Every question this document answers has already been answered generically; this document only shows where AI concepts map onto that existing answer.
 
 This document does not explain LLMs, GPUs, or inference algorithms. It explains how inference, training, and multi-model execution are ordinary consequences of the Runtime core, not new subsystems.
 
@@ -31,7 +31,7 @@ There is no routing component that "decides" between `local-infer` and `tibios-r
 
 The AI Runtime introduces no new object semantics. `Model`, `Tokenizer`, `Embedding`, `Prompt`, `Conversation Context`, Tensor artifacts, and Inference Results are ordinary Objects as already defined in `13-object-model.md`'s AI Objects section.
 
-The Object Model already resolves every AI-specific identity question. A Model Artifact is a Content Object (immutable, hash-addressed — a rollout is a new hash, never a mutation); a Model Reference is a Logical Object (mutable, versioned — a rollout is a new `ObjectVersion` pointing to the new hash). This is exactly `13`'s existing Model Reference example, not a new one invented for this document.
+The Object Model already resolves every AI-specific identity question. A Model Artifact is a Content Object (immutable, hash-addressed — a rollout is a new hash, never a mutation); a Model Reference is a Logical Object (mutable, versioned — a rollout is a new `ObjectVersion` pointing to the new hash). This is exactly `13-object-model.md`'s existing Model Reference example, not a new one invented for this document.
 
 A Conversation Context is a Logical Object like any other — it evolves (new turns) through new versions or through its own Object Lifecycle Log entries, never through in-place mutation, exactly as `13-object-model.md`'s Object Lifecycle already requires. Its persistence strategy is therefore identical to any other Logical Object and requires no AI-specific storage mechanism.
 
@@ -88,7 +88,7 @@ Client → Admission → Scheduling → Allocation → Execution Context → Wor
 ```
 
 - **Admission** admits an Inference Workload exactly as it would any other Workload — no AI-specific eligibility rule exists at this layer.
-- **Scheduling**'s Capability Filter matches the Workload's declared capability requirement (e.g. "needs 12GB CUDA") against Cluster Snapshot Resources (`14`, `16`) — this is the entire "GPU scheduling" story; nothing else is required.
+- **Scheduling**'s Capability Filter matches the Workload's declared capability requirement (e.g. "needs 12GB CUDA") against Cluster Snapshot Resources (`14-resource-model.md`, `16-scheduling-engine.md`) — this is the entire "GPU scheduling" story; nothing else is required.
 - **Allocation** commits capacity exactly as for any Workload (`15-allocation-model.md`).
 - The **Execution Context** carries a resolved Model reference (already a Content Object, already pulled if needed — knowledge plane) and an Allocation Contract (work plane), per `24-replication.md`'s knowledge/work plane distinction.
 - The **Worker** (`local-infer` or `tibios-ray`) executes, streaming `OutputChunk` events, then produces an Execution Report.

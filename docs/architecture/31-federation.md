@@ -6,15 +6,15 @@ Version: 1.0
 
 Federation answers a question no other document has answered: **how do two independent TibiOS Runtimes cooperate?** It is not Membership (`22-networking.md`, which governs Nodes joining a single cluster), not Replication (`24-replication.md`, which moves content once cooperation is already authorized), and not a merger — federating two Runtimes never produces one Runtime; both retain independent identity, independent Trust, and independent Storage.
 
-Federation closes a reference `13-object-model.md` left open since it was written: *"replication across islands requires explicit authorization... see trust boundaries in `22-networking.md`"* — a concept `22` never fully defined, because it lacked the identity to define it with. This document supplies that identity and completes the definition.
+Federation closes a reference `13-object-model.md` left open since it was written: *"replication across islands requires explicit authorization... see trust boundaries in `22-networking.md`"* — a concept `22-networking.md` never fully defined, because it lacked the identity to define it with. This document supplies that identity and completes the definition.
 
 ## Ownership
 
-Federation owns its own crate, `runtime-federation` — a genuinely new architectural language (Federation Member, Trust Island, Federation Policy), unlike the composition documents (`25`, `30`) that preceded it in Block 2. It consumes Trust, Networking, Replication, Deployment, and the Runtime API through their existing outbound contracts (`22-networking.md`, `24-replication.md`, `29-deployment.md`, `26-runtime-api.md`). Federation governs cooperation between Runtimes; it never reimplements what any of those domains already do within one.
+Federation owns its own crate, `runtime-federation` — a genuinely new architectural language (Federation Member, Trust Island, Federation Policy), unlike the composition documents (`25-ai-runtime.md`, `30-ai-services.md`) that preceded it in Block 2. It consumes Trust, Networking, Replication, Deployment, and the Runtime API through their existing outbound contracts (`22-networking.md`, `24-replication.md`, `29-deployment.md`, `26-runtime-api.md`). Federation governs cooperation between Runtimes; it never reimplements what any of those domains already do within one.
 
 ## Core Principles
 
-- Federation answers whether two Runtimes may cooperate — never whether a Node may join a cluster (`22`), and never whether content should cross (`24`).
+- Federation answers whether two Runtimes may cooperate — never whether a Node may join a cluster (`22-networking.md`), and never whether content should cross (`24-replication.md`).
 - A Federation Member is an entire Runtime, identified by `RuntimeId` (`02-project-structure.md`), never a Node.
 - Federation never reimplements Discovery, Authentication, Sessions, or Transport — `22-networking.md` remains the sole authority over all four.
 - Federation never invents a second inter-Runtime protocol. All Federation communication uses the existing Runtime API surface (`26-runtime-api.md`), subject to Federation authorization.
@@ -51,7 +51,7 @@ Federation never reimplements Discovery, Authentication, Sessions, or Transport.
 
 ## Relationship with Runtime API
 
-Federation never invents a second inter-Runtime protocol. `26-runtime-api.md` already anticipated this: *"another TibiOS Runtime"* is listed among the Runtime API's consumers. A federated Runtime calls the same Runtime API operations any other consumer calls (`26`) — Submit Workload, Query Objects, Observe Events — the only difference is that Federation Policy, not just Trust and Authorization at the Boundary (`26`'s own model), gates which existing Runtime API operations a federated Runtime may invoke.
+Federation never invents a second inter-Runtime protocol. `26-runtime-api.md` already anticipated this: *"another TibiOS Runtime"* is listed among the Runtime API's consumers. A federated Runtime calls the same Runtime API operations any other consumer calls (`26-runtime-api.md`) — Submit Workload, Query Objects, Observe Events — the only difference is that Federation Policy, not just Trust and Authorization at the Boundary (`26-runtime-api.md`'s own model), gates which existing Runtime API operations a federated Runtime may invoke.
 
 ## Relationship with Replication
 
@@ -63,7 +63,7 @@ Federation never moves content itself. It only authorizes the crossing that Repl
 
 Deployment (`29-deployment.md`) creates Runtime instances. Every Runtime instance has one `RuntimeId`. Federation consumes `RuntimeId`; it never generates or reinterprets it. Deployment does not interpret `RuntimeId` either — it produces the Deployment Unit's Identity component and hands it to the Runtime instance; what that identity means for cooperation with other Runtimes is entirely Federation's question, never Deployment's.
 
-A new Deployment Unit generation (`29`'s Reconfiguration) does not necessarily mean a new `RuntimeId` — whether reconfiguration preserves or renews Runtime Identity is a Deployment-level policy decision, but Federation Membership is always evaluated against whatever `RuntimeId` is currently presented, never against a specific process or Deployment Unit generation.
+A new Deployment Unit generation (`29-deployment.md`'s Reconfiguration) does not necessarily mean a new `RuntimeId` — whether reconfiguration preserves or renews Runtime Identity is a Deployment-level policy decision, but Federation Membership is always evaluated against whatever `RuntimeId` is currently presented, never against a specific process or Deployment Unit generation.
 
 ## Federation Lifecycle
 
@@ -83,7 +83,7 @@ Active
 Revoked
 ```
 
-`Discovered` — another `RuntimeId` becomes known, through Networking's Discovery (`22`) or explicit configuration; discovery alone grants no cooperation. `Proposed` — a Federation Membership request exists but is not yet authorized on both sides. Federation Membership is always bilateral. One Runtime cannot federate another unilaterally. `Authorized` — both Runtimes' Trust authorities have approved the Membership. Authorization establishes that cooperation may exist. Federation Policy determines its scope. `Active` — operation invocations and content crossing are permitted per Policy. Active does not imply unrestricted cooperation. Federation Policy remains continuously in effect. `Revoked` — either Runtime's Trust authority may revoke unilaterally, publishing `FederationRevoked`, immediately terminating cooperation, following the same revocation principles already established for Node Trust.
+`Discovered` — another `RuntimeId` becomes known, through Networking's Discovery (`22-networking.md`) or explicit configuration; discovery alone grants no cooperation. `Proposed` — a Federation Membership request exists but is not yet authorized on both sides. Federation Membership is always bilateral. One Runtime cannot federate another unilaterally. `Authorized` — both Runtimes' Trust authorities have approved the Membership. Authorization establishes that cooperation may exist. Federation Policy determines its scope. `Active` — operation invocations and content crossing are permitted per Policy. Active does not imply unrestricted cooperation. Federation Policy remains continuously in effect. `Revoked` — either Runtime's Trust authority may revoke unilaterally, publishing `FederationRevoked`, immediately terminating cooperation, following the same revocation principles already established for Node Trust.
 
 Federation Membership is an authoritative lifecycle, independent of Networking Sessions. Sessions may come and go without changing Membership; Membership may be revoked even while Sessions still exist.
 
@@ -103,7 +103,7 @@ Avoid: treating Node-level Trust as sufficient for Federation Trust, treating a 
 
 ## Review Checklist
 
-Before extending Federation ask: does this answer a Runtime-to-Runtime question, or does it belong to Node-to-cluster Trust (`22`)? Does it reuse the existing Runtime API surface rather than inventing a new one? Does it distinguish Federation Trust (may they cooperate) from Federation Policy (what may they do)? Does it treat Federation Membership as authoritative, never observational?
+Before extending Federation ask: does this answer a Runtime-to-Runtime question, or does it belong to Node-to-cluster Trust (`22-networking.md`)? Does it reuse the existing Runtime API surface rather than inventing a new one? Does it distinguish Federation Trust (may they cooperate) from Federation Policy (what may they do)? Does it treat Federation Membership as authoritative, never observational?
 
 ## Principles
 

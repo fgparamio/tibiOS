@@ -4,13 +4,13 @@ Version: 1.0
 
 ## Purpose
 
-The Runtime API is the single coherent surface through which anything external — an application, the SDK, the CLI, another TibiOS Runtime — addresses the Runtime. It is not a protocol, not a transport, and not a new domain. It introduces no operation that does not already exist inside a Runtime domain (`13`–`25`); it only makes those operations addressable from outside the Runtime.
+The Runtime API is the single coherent surface through which anything external — an application, the SDK, the CLI, another TibiOS Runtime — addresses the Runtime. It is not a protocol, not a transport, and not a new domain. It introduces no operation that does not already exist inside a Runtime domain (`13-object-model.md`–`25-ai-runtime.md`); it only makes those operations addressable from outside the Runtime.
 
 This document does not choose REST, gRPC, or any other protocol. It defines what can be asked of the Runtime, expressed in the Runtime's own language — the same discipline `02-project-structure.md`'s Ports already require: *"Ports express domain language. Ports never expose technology."*
 
 ## Ownership
 
-The Runtime API owns its own crate, `runtime-api` — already reserved for this purpose in `02-project-structure.md`'s Project Layout. Unlike every domain crate from `13` to `25`, `runtime-api` owns no domain logic of its own: it is a thin routing layer that maps external requests onto existing Inbound Ports, and existing Runtime Events into externally observable ones. If `runtime-api` ever needs to make a decision a domain hasn't already made, that is a signal the request doesn't belong here — not a reason to add logic to this crate.
+The Runtime API owns its own crate, `runtime-api` — already reserved for this purpose in `02-project-structure.md`'s Project Layout. Unlike every domain crate from `13-object-model.md` to `25-ai-runtime.md`, `runtime-api` owns no domain logic of its own: it is a thin routing layer that maps external requests onto existing Inbound Ports, and existing Runtime Events into externally observable ones. If `runtime-api` ever needs to make a decision a domain hasn't already made, that is a signal the request doesn't belong here — not a reason to add logic to this crate.
 
 ## Core Principles
 

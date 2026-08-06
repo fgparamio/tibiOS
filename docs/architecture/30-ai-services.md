@@ -8,7 +8,7 @@ AI Services introduces no new architecture. It composes existing Runtime concept
 
 `25-ai-runtime.md` answered how the Runtime executes AI. This document answers a different question: **how is AI offered as a standing, consumable capability of the Runtime — something a consumer can call repeatedly, addressed by identity, rather than a single Workload submitted once?**
 
-This document does not talk about models, Workers, GPU scheduling, replication, or object resolution again — those are closed (`13`–`29`). It does not talk about embeddings, agents, RAG, or tools as architectural concepts — per `25-ai-runtime.md`'s own discipline, those are Workload or Object types, not domains. An AI Service is not a model, not a Worker, and not a Runtime.
+This document does not talk about models, Workers, GPU scheduling, replication, or object resolution again — those are closed (`13-object-model.md`–`29-deployment.md`). It does not talk about embeddings, agents, RAG, or tools as architectural concepts — per `25-ai-runtime.md`'s own discipline, those are Workload or Object types, not domains. An AI Service is not a model, not a Worker, and not a Runtime.
 
 ## Ownership
 
@@ -25,25 +25,25 @@ If a future AI Service pattern cannot be expressed through these five, that is e
 ## Core Principles
 
 - AI Services introduces no new architectural primitives.
-- An AI Service is a Service Object (`13`) whose workload happens to perform AI inference, generation, classification, or similar tasks.
-- An AI Service executes as a Long-running Service or Pipeline (`18`), never a new execution pattern.
+- An AI Service is a Service Object (`13-object-model.md`) whose workload happens to perform AI inference, generation, classification, or similar tasks.
+- An AI Service executes as a Long-running Service or Pipeline (`18-worker-model.md`), never a new execution pattern.
 - An AI Service is composed from existing Workloads. Composition is orchestration, never a new execution mechanism.
 - AI Services defines reusable AI capabilities, never reusable AI infrastructure.
-- If this document cannot be expressed as a composition of `13`, `18`, `25`, `26`, and `29`, the gap belongs in one of those documents — not here.
+- If this document cannot be expressed as a composition of `13-object-model.md`, `18-worker-model.md`, `25-ai-runtime.md`, `26-runtime-api.md`, and `29-deployment.md`, the gap belongs in one of those documents — not here.
 
 ## Service Definition
 
 An AI Service is not a distinct kind of Object. It is a Service Object (`13-object-model.md`) whose behavior happens to perform AI tasks — nothing about its identity, versioning, or lifecycle differs from any other Service Object. It has a `ServiceId`, an owner, a configuration (which Model Reference(s) it uses, which capability requirements it declares), and a set of interfaces it accepts requests through.
 
-An AI Service's configuration references existing Objects — Model References, Prompt Templates, Conversation Context schemas (`13-object-model.md`'s AI Objects) — it never embeds them, for the same reason a Logical Object never embeds its Content Object (`13`). This keeps AI Services independent of model evolution — updating a Model Reference updates what the service resolves, never the service's own identity. An AI Service's declared dependencies are resolved through the Object Store (`23-object-store.md`) exactly like any other Object reference.
+An AI Service's configuration references existing Objects — Model References, Prompt Templates, Conversation Context schemas (`13-object-model.md`'s AI Objects) — it never embeds them, for the same reason a Logical Object never embeds its Content Object (`13-object-model.md`). This keeps AI Services independent of model evolution — updating a Model Reference updates what the service resolves, never the service's own identity. An AI Service's declared dependencies are resolved through the Object Store (`23-object-store.md`) exactly like any other Object reference.
 
 ## Relationship with AI Runtime
 
-`25-ai-runtime.md` established that AI execution is a specialization of the Runtime Pipeline with no new mechanism. An AI Service does not change this — it is an addressable Service Object that, when invoked, submits Workloads through the exact same pipeline `25` already described (Admission → Scheduling → Allocation → Execution Context → Worker → Execution Events → Execution Report). AI Services builds on the AI Runtime. It never extends or replaces it, and it never gives a Worker or a Model any capability `25` didn't already grant it.
+`25-ai-runtime.md` established that AI execution is a specialization of the Runtime Pipeline with no new mechanism. An AI Service does not change this — it is an addressable Service Object that, when invoked, submits Workloads through the exact same pipeline `25-ai-runtime.md` already described (Admission → Scheduling → Allocation → Execution Context → Worker → Execution Events → Execution Report). AI Services builds on the AI Runtime. It never extends or replaces it, and it never gives a Worker or a Model any capability `25-ai-runtime.md` didn't already grant it.
 
 ## Relationship with Object Store
 
-An AI Service is itself a Service Object, discovered and resolved through the Object Store (`23-object-store.md`) exactly like any other Object — by `ObjectId`, versioned like any Logical Object. Nothing about AI Services introduces a second resolution mechanism alongside the one `23` already defined. AI Services never maintains its own service registry. The Object Store already fulfills that role.
+An AI Service is itself a Service Object, discovered and resolved through the Object Store (`23-object-store.md`) exactly like any other Object — by `ObjectId`, versioned like any Logical Object. Nothing about AI Services introduces a second resolution mechanism alongside the one `23-object-store.md` already defined. AI Services never maintains its own service registry. The Object Store already fulfills that role.
 
 ## Relationship with Runtime API
 
