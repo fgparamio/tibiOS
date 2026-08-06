@@ -1,0 +1,32 @@
+[package]
+name = "runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "runtime"
+path = "src/main.rs"
+
+[dependencies]
+runtime-primitives = { workspace = true }
+runtime-object = { workspace = true }
+runtime-scheduler = { workspace = true }
+runtime-allocation = { workspace = true }
+runtime-admission = { workspace = true }
+runtime-worker = { workspace = true }
+runtime-network = { workspace = true }
+runtime-storage = { workspace = true }
+runtime-security = { workspace = true }
+runtime-observability = { workspace = true }
+runtime-state = { workspace = true }
+runtime-replication = { workspace = true }
+runtime-deployment = { workspace = true }
+runtime-api = { workspace = true }
+runtime-federation = { workspace = true }
+
+[dev-dependencies]
+cargo_metadata = { workspace = true }
