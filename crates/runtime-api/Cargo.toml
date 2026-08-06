@@ -1,0 +1,17 @@
+[package]
+name = "runtime-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+runtime-primitives = { workspace = true }
+runtime-admission = { workspace = true }
+runtime-object = { workspace = true }
+runtime-state = { workspace = true }
+runtime-allocation = { workspace = true }
+runtime-storage = { workspace = true }
+runtime-network = { workspace = true }
