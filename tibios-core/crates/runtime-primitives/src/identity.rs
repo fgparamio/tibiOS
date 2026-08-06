@@ -5,6 +5,30 @@
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
+/// Error returned when text fails to parse as a valid ULID for one of the
+/// ULID-backed identity newtypes (`ObjectId`, `NodeId`, `RuntimeId`,
+/// `WorkloadId`, `AllocationId`, `SessionId`, `TenantId`). Deliberately not
+/// `FromStr`-based: a dedicated fallible constructor (`parse`) keeps this
+/// error type visible at the call site instead of being inferred implicitly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentityParseError {
+    text: String,
+}
+
+impl IdentityParseError {
+    fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+        }
+    }
+}
+
+impl core::fmt::Display for IdentityParseError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "invalid ULID text: {:?}", self.text)
+    }
+}
+
 /// Generates a ULID-backed identity newtype implementing the identity
 /// primitive contract: `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `Hash`,
 /// `Serialize`, `Deserialize`, a `new()` Primitive Generator, `Default`
@@ -27,6 +51,26 @@ macro_rules! ulid_newtype {
             #[must_use]
             pub fn new() -> Self {
                 Self(Ulid::new())
+            }
+
+            /// Fallible text constructor: parses this identity's wrapped
+            /// `Ulid` from a 26-character ULID string, so a wire-format
+            /// converter can build the type from an incoming string without
+            /// reaching into its private field. Rejects text that is not a
+            /// valid ULID; never panics, never substitutes `Self::default()`.
+            pub fn parse(text: &str) -> Result<Self, IdentityParseError> {
+                Ulid::from_string(text)
+                    .map(Self)
+                    .map_err(|_| IdentityParseError::new(text))
+            }
+
+            /// Accessor returning the wrapped `Ulid`, whose `Display` text
+            /// is identical to this newtype's own `Display` text — the
+            /// counterpart to `parse` for a wire-format converter that
+            /// serializes back out to text.
+            #[must_use]
+            pub fn as_ulid(&self) -> Ulid {
+                self.0
             }
         }
 
@@ -97,6 +141,23 @@ impl ObjectVersion {
     pub const fn next(&self) -> Self {
         Self(self.0 + 1)
     }
+
+    /// Infallible numeric constructor. The fallible, text-based entry point
+    /// required by the wire format is composed at the call site as
+    /// `text.parse::<u64>().map(ObjectVersion::from_u64)` — `ObjectVersion`
+    /// itself owns only the numeric half of that composition.
+    #[must_use]
+    pub const fn from_u64(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// Accessor returning the wrapped `u64`, the counterpart to
+    /// `from_u64` for a wire-format converter that serializes back out to
+    /// the proto `string` representation.
+    #[must_use]
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 impl Default for ObjectVersion {
@@ -108,6 +169,64 @@ impl Default for ObjectVersion {
 #[cfg(test)]
 mod tests {
     use super::{ObjectId, ObjectVersion};
+
+    #[test]
+    fn parse_round_trips_valid_ulid_text() {
+        let original = ObjectId::new();
+        let text = format!("{original}");
+        let parsed = ObjectId::parse(&text).unwrap();
+        assert_eq!(parsed, original);
+        assert_eq!(format!("{}", parsed.as_ulid()), text);
+    }
+
+    #[test]
+    fn parse_rejects_invalid_ulid_text() {
+        let result = ObjectId::parse("not-a-valid-ulid");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_rejects_empty_text() {
+        let result = ObjectId::parse("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn identity_parse_error_display_is_not_empty() {
+        let err = ObjectId::parse("").unwrap_err();
+        assert!(!format!("{err}").is_empty());
+    }
+
+    #[test]
+    fn object_version_round_trips_valid_numeric_text() {
+        let text = "42";
+        let parsed = text.parse::<u64>().map(ObjectVersion::from_u64).unwrap();
+        assert_eq!(parsed.as_u64(), 42);
+    }
+
+    #[test]
+    fn object_version_rejects_non_numeric_text() {
+        let result = "not-a-number".parse::<u64>().map(ObjectVersion::from_u64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn object_version_rejects_empty_text() {
+        let result = "".parse::<u64>().map(ObjectVersion::from_u64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn object_version_rejects_negative_text() {
+        let result = "-1".parse::<u64>().map(ObjectVersion::from_u64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn object_version_rejects_overflowing_text() {
+        let result = "99999999999999999999".parse::<u64>().map(ObjectVersion::from_u64);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn new_generates_distinct_ids() {

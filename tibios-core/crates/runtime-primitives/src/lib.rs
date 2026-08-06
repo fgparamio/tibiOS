@@ -16,7 +16,8 @@ mod time;
 pub use content::ContentHash;
 pub use error::ErrorClass;
 pub use identity::{
-    AllocationId, NodeId, ObjectId, ObjectVersion, RuntimeId, SessionId, TenantId, WorkloadId,
+    AllocationId, IdentityParseError, NodeId, ObjectId, ObjectVersion, RuntimeId, SessionId,
+    TenantId, WorkloadId,
 };
 pub use lease::Lease;
 pub use time::Timestamp;
