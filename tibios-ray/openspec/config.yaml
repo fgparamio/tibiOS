@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Python >=3.14, uv build backend (uv_build), single dependency ray>=2.56.1.
+  No code yet beyond a placeholder: src/tibios_ray/__init__.py defines main() -> prints
+  "Hello from tibios-ray!". Entry point: [project.scripts] tibios-ray = "tibios_ray:main".
+  README.md is empty. No conventions established yet — fresh skeleton.
+  Relationship: tibios-ray is one of two Worker implementations for the sibling Rust
+  project tibios-core's Runtime (the other is in-process local-infer), reached over gRPC.
+  See ./CLAUDE.md and, in the sibling repo ../tibios-core (pinned at tag architecture-v1.0):
+    - docs/architecture/18-worker-model.md — the Worker contract (Execution Context/Channel/
+      Events/Report/Pulse, cancellation, the four execution patterns).
+    - docs/architecture/25-ai-runtime.md — confirms tibios-ray gets no special treatment.
+  The gRPC/proto contract does not exist yet (proposed shared location: ../TibiOS/proto/).
+  Until it exists, 18-worker-model.md is the source of truth for what the interface must express.
+  Testing: none configured yet (no pytest/ruff/black/mypy declared in pyproject.toml).
+  Style: conventional commits, no AI attribution (global CLAUDE.md policy).
+
+testing:
+  strict_tdd: false
+  strict_tdd_reason: "unavailable — no test runner detected"
+  test_runner: none configured yet
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+    contract: false
+  quality_tools: none configured yet (no ruff/black/mypy in pyproject.toml)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Do not duplicate the Worker contract spec from tibios-core; reference it
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Any requirement touching the gRPC Worker interface MUST cite
+      ../tibios-core/docs/architecture/18-worker-model.md or 25-ai-runtime.md
+  design:
+    - Document architecture decisions with rationale
+    - Never contradict tibios-core's docs/architecture/ (frozen, tag architecture-v1.0);
+      resolve apparent contradictions there, not by reinterpreting locally
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - tdd: false
+    - test_command: none configured yet
+  verify:
+    test_command: none configured yet
+    build_command: "uv build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
