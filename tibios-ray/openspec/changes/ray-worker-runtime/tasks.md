@@ -55,12 +55,16 @@ Chain strategy: stacked-to-main
 - [x] 3.2 pyright fixture: `policy.plan("deepseek")  # type: ignore[arg-type]` + `reportUnnecessaryTypeIgnoreComment = true` (correct pyright rule name; `reportUnnecessaryTypeIgnore` is not a recognized pyright setting) — done, `tests/unit/selection/pyright_fixtures/rejects_bare_family_string.py`, guard verified to actually fire (see `sdd/ray-worker-runtime/apply-progress`)
 - [x] 3.3 `tests/unit/selection/`: decision has only backend+quantization, no discovery step — done 2026-08-06, 13/13 new tests passing (99/99 total), ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
 
-## Phase 4: capabilities/ provider surface (PR 4)
+## Phase 4: capabilities/ provider surface (PR 4) — COMPLETE 2026-08-06
 
-- [ ] 4.1 `names.py`: `CapabilityName` + shape validation
-- [ ] 4.2 `descriptor.py`: `CapabilityDescriptor`, `CapabilityFlags`, `CapabilityCatalog`
-- [ ] 4.3 `provider.py`: `CapabilityProvider` Protocol (descriptor property, async execute)
-- [ ] 4.4 `tests/unit/capabilities/`: conforming provider descriptor shape is stable
+- [x] 4.1 `names.py`: `CapabilityName` + shape validation — generic dot-separated lowercase snake_case shape, not a hardcoded enum (Phase 2's concrete Providers don't exist yet) — done
+- [x] 4.2 `descriptor.py`: `CapabilityDescriptor`, `CapabilityFlags`, `CapabilityCatalog` — plus `ModelFamily` (gap resolution, see below) — done
+- [x] 4.3 `provider.py`: `CapabilityProvider` Protocol (descriptor property, async execute) — `execute()` returns `ExecutionReport`, not `ExecutionMetrics` (gap resolution, see below) — done
+- [x] 4.4 `tests/unit/capabilities/`: conforming provider descriptor shape is stable, `CapabilityName` shape validation edge cases, `ModelFamily`/`CapabilityDescriptor` construction — done 2026-08-06, 36/36 new tests passing (135/135 total), ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
+
+**Two undefined-type gaps resolved during apply (not resolved by design.md/tasks.md as written):**
+- **`ExecutionMetrics`** (referenced in `design.md`'s Key Contracts but never defined anywhere): resolved as the already-existing `ExecutionReport` — see `capabilities/provider.py`'s module docstring for full reasoning. No new type added to `execution/`; Phase 1 was not reopened.
+- **`ModelFamily`** (referenced in `design.md`'s `CapabilityDescriptor.families: frozenset[ModelFamily]` but never defined anywhere): defined as a small frozen, slotted dataclass in `capabilities/descriptor.py`, shaped like `backends/adapter.py`'s `BackendId` (single opaque `value: str`) — outward catalog metadata only, per `design.md`'s own boundary rule that family strings never enter the inward execution path.
 
 ## Phase 5: runtime/ lifecycle host (PR 5)
 
