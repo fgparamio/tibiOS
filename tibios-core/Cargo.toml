@@ -29,6 +29,10 @@ rust-version = "1.93"
 serde = { version = "1", features = ["derive"] }
 ulid = { version = "1", features = ["serde"] }
 cargo_metadata = "0.19"
+tonic = "0.13"
+prost = "0.13"
+tonic-build = "0.13"
+sha2 = "0.11"
 runtime-primitives = { path = "crates/runtime-primitives" }
 runtime-object = { path = "crates/runtime-object" }
 runtime-scheduler = { path = "crates/runtime-scheduler" }

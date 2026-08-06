@@ -7,7 +7,26 @@ license.workspace = true
 [lints]
 workspace = true
 
+[lib]
+# The generated Worker gRPC code (build.rs, `compile_well_known_types(true)`)
+# carries `google.protobuf.Duration`'s upstream doc comments verbatim, which
+# contain Python code samples that are not valid Rust; rustdoc treats them as
+# doctests regardless of the module's (private) visibility and fails to
+# compile them. This is the documented `prost-build` fallback for exactly
+# this case (`prost_build::Config::disable_comments` doc example). No
+# `#[cfg(test)]` unit tests or `tests/*.rs` integration tests are affected —
+# only `cargo test --doc`.
+doctest = false
+
 [dependencies]
 runtime-primitives = { workspace = true }
 runtime-allocation = { workspace = true }
 runtime-object = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+
+[build-dependencies]
+tonic-build = { workspace = true }
+
+[dev-dependencies]
+sha2 = { workspace = true }
