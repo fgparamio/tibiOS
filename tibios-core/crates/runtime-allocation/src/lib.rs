@@ -66,6 +66,7 @@ mod tests {
     fn clone_and_copy_preserve_value() {
         let a = AllocationContract::new(Duration::from_secs(45));
         let via_copy = a;
+        #[allow(clippy::clone_on_copy)]
         let via_clone = a.clone();
         assert_eq!(a, via_copy);
         assert_eq!(a, via_clone);

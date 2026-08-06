@@ -6,8 +6,8 @@
 //! — no async-runtime crate and no trait-macro helper crate of any kind.
 
 use std::collections::{BTreeMap, HashSet};
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use core::future::Future;
 use core::pin::pin;

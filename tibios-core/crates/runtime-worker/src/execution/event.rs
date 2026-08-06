@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn execution_event_matches_exhaustively_over_all_six_variants() {
-        let events = vec![
+        let events = [
             ExecutionEvent::OutputChunk(OutputChunk {
                 data: vec![1, 2, 3],
                 sequence: 0,
