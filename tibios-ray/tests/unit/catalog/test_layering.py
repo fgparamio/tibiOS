@@ -81,12 +81,36 @@ def test_no_module_outside_catalog_imports_catalog() -> None:
     )
 
 
+def _imports_package_root_exactly(source_file: Path) -> bool:
+    """Whether `source_file` literally names `tibios_ray.catalog` — the
+    package root — as an import target: `import tibios_ray.catalog`,
+    `from tibios_ray.catalog import X`, or `from tibios_ray import
+    catalog`. Deliberately NOT a prefix match: `from
+    tibios_ray.catalog.errors import X` names the `errors` submodule
+    directly and is the permitted pattern used throughout
+    `capabilities/`; only reaching through the package root itself is
+    CP8's circular-init hazard."""
+    tree = ast.parse(source_file.read_text(), filename=str(source_file))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name == _CATALOG_PACKAGE_MODULE for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == _CATALOG_PACKAGE_MODULE:
+                return True
+            if node.module == "tibios_ray" and any(
+                alias.name == "catalog" for alias in node.names
+            ):
+                return True
+    return False
+
+
 def test_no_module_under_catalog_imports_the_catalog_package_root() -> None:
-    offenders: dict[str, set[str]] = {}
-    for source_file in _CATALOG_PACKAGE.rglob("*.py"):
-        imported = _imported_dotted_modules(source_file)
-        if _CATALOG_PACKAGE_MODULE in imported:
-            offenders[str(source_file.relative_to(_SRC_ROOT))] = {_CATALOG_PACKAGE_MODULE}
+    offenders = [
+        str(source_file.relative_to(_SRC_ROOT))
+        for source_file in _CATALOG_PACKAGE.rglob("*.py")
+        if _imports_package_root_exactly(source_file)
+    ]
 
     assert not offenders, (
         f"module(s) under catalog/ import tibios_ray.catalog itself (CP8's "
