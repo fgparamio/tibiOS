@@ -606,3 +606,19 @@ fn runtime_worker_denies_private_interfaces_and_bounds_lints() {
         lib_rs.display()
     );
 }
+
+/// Spec scenario "Doc comment cites the owning doc"
+/// (`runtime-worker/spec.md`, "Crate Doc Comment Cites the Owning Document"):
+/// `lib.rs`'s crate-level doc comment must reference `18-worker-model.md`.
+#[test]
+fn runtime_worker_doc_comment_cites_the_owning_document() {
+    let lib_rs = workspace_root().join(WORKER_SRC).join("lib.rs");
+    let contents = std::fs::read_to_string(&lib_rs)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", lib_rs.display()));
+
+    assert!(
+        contents.contains("18-worker-model.md"),
+        "expected the crate doc comment in {} to cite `18-worker-model.md`",
+        lib_rs.display()
+    );
+}

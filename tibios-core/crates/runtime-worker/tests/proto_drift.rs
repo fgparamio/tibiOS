@@ -74,8 +74,8 @@ fn parse_manifest() -> Vec<(String, String)> {
 }
 
 fn sha256_hex(path: &Path) -> String {
-    let bytes = std::fs::read(path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+    let bytes =
+        std::fs::read(path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
     let digest = Sha256::digest(&bytes);
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }

@@ -18,10 +18,7 @@ fn main() {
     preflight_protoc();
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let proto_root = manifest_dir
-        .join("..")
-        .join("..")
-        .join("proto");
+    let proto_root = manifest_dir.join("..").join("..").join("proto");
 
     let identity_proto = proto_root
         .join("tibios")
@@ -81,7 +78,11 @@ fn path_contains_protoc() -> bool {
     let Some(path_var) = env::var_os("PATH") else {
         return false;
     };
-    let exe_name = if cfg!(windows) { "protoc.exe" } else { "protoc" };
+    let exe_name = if cfg!(windows) {
+        "protoc.exe"
+    } else {
+        "protoc"
+    };
     env::split_paths(&path_var).any(|dir| is_executable_file(&dir.join(exe_name)))
 }
 

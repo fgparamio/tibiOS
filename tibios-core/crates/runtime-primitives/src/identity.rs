@@ -224,7 +224,9 @@ mod tests {
 
     #[test]
     fn object_version_rejects_overflowing_text() {
-        let result = "99999999999999999999".parse::<u64>().map(ObjectVersion::from_u64);
+        let result = "99999999999999999999"
+            .parse::<u64>()
+            .map(ObjectVersion::from_u64);
         assert!(result.is_err());
     }
 

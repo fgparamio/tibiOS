@@ -154,7 +154,8 @@ impl TryFrom<identity_proto::WorkloadId> for runtime_primitives::WorkloadId {
     type Error = ConversionError;
 
     fn try_from(value: identity_proto::WorkloadId) -> Result<Self, Self::Error> {
-        Self::parse(&value.value).map_err(|source| ConversionError::InvalidUlid("WorkloadId", source))
+        Self::parse(&value.value)
+            .map_err(|source| ConversionError::InvalidUlid("WorkloadId", source))
     }
 }
 
@@ -255,10 +256,12 @@ impl TryFrom<worker_proto::ExecutionResponse> for ExecutionResponseArm {
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_proto, worker_proto, CheckpointCreated, Classify, ConversionError,
-        ExecutionEventArm, ExecutionResponseArm,
+        CheckpointCreated, Classify, ConversionError, ExecutionEventArm, ExecutionResponseArm,
+        identity_proto, worker_proto,
     };
-    use runtime_primitives::{AllocationId, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId};
+    use runtime_primitives::{
+        AllocationId, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId,
+    };
 
     #[test]
     fn object_id_round_trips_through_wire() {
@@ -297,7 +300,10 @@ mod tests {
             value: "not-a-valid-ulid".to_string(),
         };
         let result = WorkloadId::try_from(wire);
-        assert!(matches!(result, Err(ConversionError::InvalidUlid("WorkloadId", _))));
+        assert!(matches!(
+            result,
+            Err(ConversionError::InvalidUlid("WorkloadId", _))
+        ));
     }
 
     #[test]
@@ -334,7 +340,10 @@ mod tests {
             value: "not-a-number".to_string(),
         };
         let result = ObjectVersion::try_from(wire);
-        assert!(matches!(result, Err(ConversionError::InvalidObjectVersion(_))));
+        assert!(matches!(
+            result,
+            Err(ConversionError::InvalidObjectVersion(_))
+        ));
     }
 
     #[test]
