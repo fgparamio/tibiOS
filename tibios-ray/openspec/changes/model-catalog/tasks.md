@@ -105,11 +105,11 @@ both resolution-type guards + pyright fixture, ~359 changed lines).
 
 ## Phase 5: embedding + rerank (PR 5)
 
-- [ ] 5.1 `catalog/entries/embedding.py`: `bge` (`BAAI/bge-m3`, `BAAI/bge-large-en-v1.5`), `nomic_embed` (`nomic-ai/nomic-embed-text-v1.5`), `e5` (`intfloat/multilingual-e5-large`, `intfloat/e5-large-v2`), `jina_embeddings` (`jinaai/jina-embeddings-v3`) — footprint figures per MC13's formula (`ceil_gib(parameter_count × bits/8 × 1.2)`)
-- [ ] 5.2 `catalog/entries/rerank.py`: `bge_reranker` (`BAAI/bge-reranker-v2-m3`), `jina_reranker` (`jinaai/jina-reranker-v2-base-multilingual`)
-- [ ] 5.3 `tests/unit/catalog/test_embedding_entries.py`: RED-first — local `ModelCatalog(EMBEDDING_ENTRIES)` fixture, family coverage for `bge`/`nomic_embed`/`e5`/`jina_embeddings`, one full-equality stability assertion per family, derivation round-trip
-- [ ] 5.4 `tests/unit/catalog/test_rerank_entries.py`: same pattern for `bge_reranker`/`jina_reranker`
-- [ ] 5.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
+- [x] 5.1 `catalog/entries/embedding.py`: `bge` (`BAAI/bge-m3`, `BAAI/bge-large-en-v1.5`), `nomic_embed` (`nomic-ai/nomic-embed-text-v1.5`), `e5` (`intfloat/multilingual-e5-large`, `intfloat/e5-large-v2`), `jina_embeddings` (`jinaai/jina-embeddings-v3`) — footprint figures per MC13's formula (`ceil_gib(parameter_count × bits/8 × 1.2)`)
+- [x] 5.2 `catalog/entries/rerank.py`: `bge_reranker` (`BAAI/bge-reranker-v2-m3`), `jina_reranker` (`jinaai/jina-reranker-v2-base-multilingual`)
+- [x] 5.3 `tests/unit/catalog/test_embedding_entries.py`: RED-first — local `ModelCatalog(EMBEDDING_ENTRIES)` fixture, family coverage for `bge`/`nomic_embed`/`e5`/`jina_embeddings`, one full-equality stability assertion per family, derivation round-trip
+- [x] 5.4 `tests/unit/catalog/test_rerank_entries.py`: same pattern for `bge_reranker`/`jina_reranker`
+- [x] 5.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
 ## Phase 6: vision (PR 6)
 
