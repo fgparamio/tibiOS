@@ -2,24 +2,34 @@
 //!
 //! Implements `worker-wire-adapter/spec.md`: the boundary between the
 //! generated `tonic`/`prost` wire types (`super::tibios::{primitives,
-//! worker}::v1`) and their `runtime-primitives` domain counterparts. Scoped
-//! exactly to the five identity-wrapper messages (`ObjectId`,
-//! `ObjectVersion`, `ContentHash`, `WorkloadId`, `AllocationId`) and the
-//! two oneofs (`ExecutionEvent`'s six arms, `ExecutionResponse`'s two
-//! arms). Worker domain types (`ExecutionContext`, `ExecutionReport`, and
-//! the rest of `18-worker-model.md`'s domain model) are out of scope — they
-//! do not exist yet and are not converted here. `ConversionError` implements
-//! the public `runtime_primitives::Classify` trait directly; no private
-//! copy of that trait is defined in this crate.
-//!
-//! `dead_code` is allowed at module scope: this boundary is consumed by a
-//! future phase that wires the actual `WorkerExecution` RPCs (out of scope
-//! here — see the module doc comment above); today it is exercised only by
-//! this module's own unit tests, which does not count as "used" for a
-//! plain (non-test) library build.
-#![allow(dead_code)]
+//! worker}::v1`) and their `runtime-primitives`/`runtime-allocation`/
+//! `runtime-worker` domain counterparts. Covers the five identity-wrapper
+//! messages (`ObjectId`, `ObjectVersion`, `ContentHash`, `WorkloadId`,
+//! `AllocationId`), the two oneofs (`ExecutionEvent`'s six arms,
+//! `ExecutionResponse`'s two arms), and — now that the Worker domain types
+//! exist (`worker-inbound-port`) — `ExecutionContext`, `ExecutionReport`,
+//! `ExecutionPulse`, and `AllocationContract`. Every `TryFrom`/`From` impl
+//! in this file targets a real domain type; it defines no local mirror
+//! type for any of them (`worker-wire-adapter/spec.md` — "Conversions
+//! Target Real Domain Types, No Local Mirror Remains"). The one
+//! adapter-local type this file still defines, `ResponseFrame`, is not a
+//! mirror: the domain has no `ExecutionResponse`-shaped type to mirror —
+//! the terminal Report travels as `execute`'s return value, never as a
+//! frame on a channel (design.md D10 Consequences) — so `ResponseFrame` is
+//! this boundary's own routing type distinguishing "this frame is an
+//! event" from "this frame is the terminal report". A routing enum (this
+//! shape) was chosen over two independent `TryFrom` impls because it keeps
+//! every existing rejection scenario's test shape unchanged (`tasks.md`
+//! 5a.3's flagged implementation choice). `ConversionError` implements the
+//! public `runtime_primitives::Classify` trait directly; no private copy
+//! of that trait is defined in this crate.
 
 use super::tibios::{primitives::v1 as identity_proto, worker::v1 as worker_proto};
+
+/// The wire's `google.protobuf.Duration`, compiled locally
+/// (`build.rs`'s `compile_well_known_types(true)`) rather than pulled in
+/// via the `prost-types` crate.
+type WireDuration = super::google::protobuf::Duration;
 
 /// Every rejection this boundary can produce. Every variant classifies
 /// `Permanent` (`04-error-handling.md:119`) — invalid wire content is
@@ -47,6 +57,15 @@ pub enum ConversionError {
     UnsetExecutionEventOneof,
     /// `ExecutionResponse.payload` was unset at the wire level.
     UnsetExecutionResponseOneof,
+    /// A wire `ExecutionPhase` was `EXECUTION_PHASE_UNSPECIFIED` (proto
+    /// tag zero) or an unrecognized discriminant — neither is a domain
+    /// `ExecutionPhase` value (`runtime-primitives/spec.md` — "An unset
+    /// wire ExecutionPhase classifies Permanent").
+    UnspecifiedExecutionPhase,
+    /// A wire `google.protobuf.Duration` carried a negative `seconds` or
+    /// `nanos` field. `core::time::Duration` cannot represent a negative
+    /// span, so it is rejected rather than silently made positive.
+    NegativeDuration,
 }
 
 impl core::fmt::Display for ConversionError {
@@ -67,6 +86,12 @@ impl core::fmt::Display for ConversionError {
             Self::UnsetExecutionResponseOneof => {
                 write!(f, "ExecutionResponse.payload was unset on the wire")
             }
+            Self::UnspecifiedExecutionPhase => {
+                write!(f, "wire ExecutionPhase was EXECUTION_PHASE_UNSPECIFIED")
+            }
+            Self::NegativeDuration => {
+                write!(f, "wire Duration had a negative seconds or nanos field")
+            }
         }
     }
 }
@@ -78,7 +103,9 @@ impl runtime_primitives::Classify for ConversionError {
             | Self::InvalidObjectVersion(_)
             | Self::MissingField(_)
             | Self::UnsetExecutionEventOneof
-            | Self::UnsetExecutionResponseOneof => runtime_primitives::ErrorClass::Permanent,
+            | Self::UnsetExecutionResponseOneof
+            | Self::UnspecifiedExecutionPhase
+            | Self::NegativeDuration => runtime_primitives::ErrorClass::Permanent,
         }
     }
 }
@@ -169,16 +196,174 @@ impl TryFrom<identity_proto::AllocationId> for runtime_primitives::AllocationId 
     }
 }
 
-/// Domain-shape counterpart to the wire `CheckpointCreated` arm.
-/// `checkpoint_object_id` has no meaningful empty/absent domain variant, so
-/// it is resolved to a non-optional `runtime_primitives::ObjectId` here
-/// rather than carried as the wire `Option`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CheckpointCreated {
-    checkpoint_object_id: runtime_primitives::ObjectId,
+/// Converts a wire `google.protobuf.Duration` into `core::time::Duration`.
+/// `google.protobuf.Duration` permits a negative `seconds`/`nanos` pair;
+/// `core::time::Duration` cannot represent a negative span, so either
+/// field being negative is rejected rather than silently made positive
+/// (`tasks.md` 5a.5). Shared by both `AllocationContract.max_execution_duration`
+/// and `ExecutionReport.duration`.
+fn duration_from_proto(value: WireDuration) -> Result<core::time::Duration, ConversionError> {
+    if value.seconds < 0 || value.nanos < 0 {
+        return Err(ConversionError::NegativeDuration);
+    }
+    Ok(core::time::Duration::new(
+        value.seconds as u64,
+        value.nanos as u32,
+    ))
 }
 
-impl TryFrom<worker_proto::CheckpointCreated> for CheckpointCreated {
+impl TryFrom<worker_proto::ExecutionPhase> for crate::execution::report::ExecutionPhase {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::ExecutionPhase) -> Result<Self, Self::Error> {
+        match value {
+            worker_proto::ExecutionPhase::Unspecified => {
+                Err(ConversionError::UnspecifiedExecutionPhase)
+            }
+            worker_proto::ExecutionPhase::Received => Ok(Self::Received),
+            worker_proto::ExecutionPhase::Prepared => Ok(Self::Prepared),
+            worker_proto::ExecutionPhase::Running => Ok(Self::Running),
+            worker_proto::ExecutionPhase::Completed => Ok(Self::Completed),
+            worker_proto::ExecutionPhase::Failed => Ok(Self::Failed),
+            worker_proto::ExecutionPhase::Cancelled => Ok(Self::Cancelled),
+        }
+    }
+}
+
+/// Resolves an `ExecutionReport`/`ExecutionPulse` phase tag — stored as a
+/// raw `i32` at the wire level because proto3 enum fields must tolerate an
+/// unrecognized discriminant — into the domain `ExecutionPhase`. An
+/// unrecognized `i32` collapses to `Unspecified` and is rejected the same
+/// way the wire's own tag-zero value is.
+fn execution_phase_from_i32(
+    raw: i32,
+) -> Result<crate::execution::report::ExecutionPhase, ConversionError> {
+    worker_proto::ExecutionPhase::try_from(raw)
+        .unwrap_or(worker_proto::ExecutionPhase::Unspecified)
+        .try_into()
+}
+
+impl TryFrom<worker_proto::AllocationContract> for runtime_allocation::AllocationContract {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::AllocationContract) -> Result<Self, Self::Error> {
+        let max_execution_duration = value
+            .max_execution_duration
+            .ok_or(ConversionError::MissingField("max_execution_duration"))?;
+        let max_execution_duration = duration_from_proto(max_execution_duration)?;
+        Ok(Self::new(max_execution_duration))
+    }
+}
+
+impl TryFrom<worker_proto::ResolvedModelRef> for crate::execution::context::ResolvedDependency {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::ResolvedModelRef) -> Result<Self, Self::Error> {
+        let object_id = value
+            .object_id
+            .ok_or(ConversionError::MissingField("object_id"))?
+            .try_into()?;
+        let object_version = value
+            .object_version
+            .ok_or(ConversionError::MissingField("object_version"))?
+            .try_into()?;
+        let content_hash = value
+            .content_hash
+            .ok_or(ConversionError::MissingField("content_hash"))?
+            .try_into()?;
+        Ok(Self::new(object_id, object_version, content_hash))
+    }
+}
+
+impl From<worker_proto::SecurityContext> for crate::execution::context::SecurityContext {
+    fn from(value: worker_proto::SecurityContext) -> Self {
+        Self::new(value.tenant_id, value.principal_id, value.grant_scope)
+    }
+}
+
+impl From<worker_proto::ObservabilityContext> for crate::execution::context::ObservabilityContext {
+    fn from(value: worker_proto::ObservabilityContext) -> Self {
+        Self::new(value.trace_id, value.span_id)
+    }
+}
+
+impl TryFrom<worker_proto::ExecutionContext> for crate::execution::context::ExecutionContext {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::ExecutionContext) -> Result<Self, Self::Error> {
+        let workload_id = value
+            .workload_id
+            .ok_or(ConversionError::MissingField("workload_id"))?
+            .try_into()?;
+        let allocation_id = value
+            .allocation_id
+            .ok_or(ConversionError::MissingField("allocation_id"))?
+            .try_into()?;
+        let allocation_contract = value
+            .allocation_contract
+            .ok_or(ConversionError::MissingField("allocation_contract"))?
+            .try_into()?;
+        let dependencies = value
+            .dependencies
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?;
+        let security_context = value
+            .security_context
+            .ok_or(ConversionError::MissingField("security_context"))?
+            .into();
+        let observability_context = value
+            .observability_context
+            .ok_or(ConversionError::MissingField("observability_context"))?
+            .into();
+        // `execution_parameters` conversion itself is infallible: the wire's
+        // `HashMap<String, String>` becomes the domain's `BTreeMap<String,
+        // String>` (D10 Consequences), a plain re-keying with no fallible
+        // step (`tasks.md` 5a.10).
+        let execution_parameters = value.execution_parameters.into_iter().collect();
+
+        Ok(Self::new(
+            workload_id,
+            allocation_id,
+            allocation_contract,
+            dependencies,
+            security_context,
+            observability_context,
+            execution_parameters,
+        ))
+    }
+}
+
+impl From<worker_proto::OutputChunk> for crate::execution::event::OutputChunk {
+    fn from(value: worker_proto::OutputChunk) -> Self {
+        Self {
+            data: value.data,
+            sequence: value.sequence,
+        }
+    }
+}
+
+impl From<worker_proto::Progress> for crate::execution::event::Progress {
+    fn from(value: worker_proto::Progress) -> Self {
+        Self {
+            fraction_complete: value.fraction_complete,
+            message: value.message,
+        }
+    }
+}
+
+impl From<worker_proto::Warning> for crate::execution::event::Warning {
+    fn from(value: worker_proto::Warning) -> Self {
+        Self {
+            message: value.message,
+        }
+    }
+}
+
+/// `checkpoint_object_id` has no meaningful empty/absent domain variant,
+/// so it stays fallible — the one arm among the six that cannot be a
+/// plain `From`.
+impl TryFrom<worker_proto::CheckpointCreated> for crate::execution::event::CheckpointCreated {
     type Error = ConversionError;
 
     fn try_from(value: worker_proto::CheckpointCreated) -> Result<Self, Self::Error> {
@@ -192,47 +377,91 @@ impl TryFrom<worker_proto::CheckpointCreated> for CheckpointCreated {
     }
 }
 
-/// Non-optional counterpart to `worker_proto::execution_event::Arm`
-/// (carried as `Option` at the wire level because `oneof` is always
-/// optional in proto3). Carries each arm's payload verbatim except
-/// `CheckpointCreated`, whose required identity field is resolved eagerly
-/// (see `CheckpointCreated` above).
-#[derive(Debug, Clone, PartialEq)]
-enum ExecutionEventArm {
-    OutputChunk(worker_proto::OutputChunk),
-    Progress(worker_proto::Progress),
-    Warning(worker_proto::Warning),
-    CheckpointCreated(CheckpointCreated),
-    MetricsSnapshot(worker_proto::MetricsSnapshot),
-    EndOfStream(worker_proto::EndOfStream),
+impl From<worker_proto::MetricsSnapshot> for crate::execution::event::MetricsSnapshot {
+    fn from(value: worker_proto::MetricsSnapshot) -> Self {
+        Self {
+            metrics: value.metrics.into_iter().collect(),
+        }
+    }
 }
 
-impl TryFrom<worker_proto::ExecutionEvent> for ExecutionEventArm {
+impl From<worker_proto::EndOfStream> for crate::execution::event::EndOfStream {
+    fn from(_value: worker_proto::EndOfStream) -> Self {
+        Self
+    }
+}
+
+impl TryFrom<worker_proto::ExecutionEvent> for crate::execution::event::ExecutionEvent {
     type Error = ConversionError;
 
     fn try_from(value: worker_proto::ExecutionEvent) -> Result<Self, Self::Error> {
         use worker_proto::execution_event::Arm;
 
         match value.arm {
-            Some(Arm::OutputChunk(v)) => Ok(Self::OutputChunk(v)),
-            Some(Arm::Progress(v)) => Ok(Self::Progress(v)),
-            Some(Arm::Warning(v)) => Ok(Self::Warning(v)),
+            Some(Arm::OutputChunk(v)) => Ok(Self::OutputChunk(v.into())),
+            Some(Arm::Progress(v)) => Ok(Self::Progress(v.into())),
+            Some(Arm::Warning(v)) => Ok(Self::Warning(v.into())),
             Some(Arm::CheckpointCreated(v)) => Ok(Self::CheckpointCreated(v.try_into()?)),
-            Some(Arm::MetricsSnapshot(v)) => Ok(Self::MetricsSnapshot(v)),
-            Some(Arm::EndOfStream(v)) => Ok(Self::EndOfStream(v)),
+            Some(Arm::MetricsSnapshot(v)) => Ok(Self::MetricsSnapshot(v.into())),
+            Some(Arm::EndOfStream(v)) => Ok(Self::EndOfStream(v.into())),
             None => Err(ConversionError::UnsetExecutionEventOneof),
         }
     }
 }
 
-/// Non-optional counterpart to `worker_proto::execution_response::Payload`.
-#[derive(Debug, Clone, PartialEq)]
-enum ExecutionResponseArm {
-    Event(ExecutionEventArm),
-    Report(worker_proto::ExecutionReport),
+impl TryFrom<worker_proto::ExecutionReport> for crate::execution::report::ExecutionReport {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::ExecutionReport) -> Result<Self, Self::Error> {
+        let final_phase = execution_phase_from_i32(value.final_phase)?;
+        let duration = value
+            .duration
+            .ok_or(ConversionError::MissingField("duration"))?;
+        let duration = duration_from_proto(duration)?;
+        Ok(Self {
+            final_phase,
+            duration,
+            trace_id: value.trace_id,
+            summary: value.summary,
+        })
+    }
 }
 
-impl TryFrom<worker_proto::ExecutionResponse> for ExecutionResponseArm {
+impl TryFrom<worker_proto::ExecutionPulse> for crate::execution::report::ExecutionPulse {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::ExecutionPulse) -> Result<Self, Self::Error> {
+        let phase = execution_phase_from_i32(value.phase)?;
+        Ok(Self {
+            phase,
+            healthy: value.healthy,
+        })
+    }
+}
+
+/// This boundary's own routing type for the `ExecutionResponse` envelope:
+/// "this frame is an event" vs. "this frame is the terminal report". Not a
+/// mirror of a domain type — the domain has no `ExecutionResponse`-shaped
+/// type at all (the Report travels as `execute`'s return value, never as a
+/// channel frame; design.md D10 Consequences) — so this is genuinely
+/// adapter-only routing, exactly the case `worker-wire-adapter/spec.md`'s
+/// "no local mirror" requirement carves out (`tasks.md` 5a.3).
+///
+/// `dead_code` is narrowly allowed on this one item (not at module scope —
+/// `tasks.md` 5a.16): a future phase wires the actual `WorkerExecution`
+/// RPCs and consumes this type (out of scope for this slice); today it is
+/// exercised only by this module's own unit tests, which does not count as
+/// "used" for a plain (non-test) library build. Every other conversion in
+/// this file is exercised outside `#[cfg(test)]` too (as trait impls
+/// callable by any future consumer), so no other item needs this allow.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
+enum ResponseFrame {
+    Event(crate::execution::event::ExecutionEvent),
+    Report(crate::execution::report::ExecutionReport),
+}
+
+impl TryFrom<worker_proto::ExecutionResponse> for ResponseFrame {
     type Error = ConversionError;
 
     fn try_from(value: worker_proto::ExecutionResponse) -> Result<Self, Self::Error> {
@@ -240,7 +469,7 @@ impl TryFrom<worker_proto::ExecutionResponse> for ExecutionResponseArm {
 
         match value.payload {
             Some(Payload::Event(v)) => Ok(Self::Event(v.try_into()?)),
-            Some(Payload::Report(v)) => Ok(Self::Report(v)),
+            Some(Payload::Report(v)) => Ok(Self::Report(v.try_into()?)),
             None => Err(ConversionError::UnsetExecutionResponseOneof),
         }
     }
@@ -248,10 +477,11 @@ impl TryFrom<worker_proto::ExecutionResponse> for ExecutionResponseArm {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CheckpointCreated, ConversionError, ExecutionEventArm, ExecutionResponseArm,
-        identity_proto, worker_proto,
-    };
+    use super::{ConversionError, ResponseFrame, WireDuration, identity_proto, worker_proto};
+    use crate::execution::context::ExecutionContext;
+    use crate::execution::event::{CheckpointCreated, ExecutionEvent};
+    use crate::execution::report::ExecutionPhase;
+    use runtime_allocation::AllocationContract;
     use runtime_primitives::{
         AllocationId, Classify, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId,
     };
@@ -377,8 +607,8 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionEventArm::OutputChunk(_)));
+        let result = ExecutionEvent::try_from(wire).unwrap();
+        assert!(matches!(result, ExecutionEvent::OutputChunk(_)));
     }
 
     #[test]
@@ -391,8 +621,8 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionEventArm::Progress(_)));
+        let result = ExecutionEvent::try_from(wire).unwrap();
+        assert!(matches!(result, ExecutionEvent::Progress(_)));
     }
 
     #[test]
@@ -404,8 +634,8 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionEventArm::Warning(_)));
+        let result = ExecutionEvent::try_from(wire).unwrap();
+        assert!(matches!(result, ExecutionEvent::Warning(_)));
     }
 
     #[test]
@@ -419,9 +649,9 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
+        let result = ExecutionEvent::try_from(wire).unwrap();
         match result {
-            ExecutionEventArm::CheckpointCreated(checkpoint) => {
+            ExecutionEvent::CheckpointCreated(checkpoint) => {
                 assert_eq!(checkpoint.checkpoint_object_id, expected);
             }
             _ => panic!("expected CheckpointCreated arm"),
@@ -437,7 +667,7 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire);
+        let result = ExecutionEvent::try_from(wire);
         assert_eq!(
             result,
             Err(ConversionError::MissingField("checkpoint_object_id"))
@@ -453,8 +683,8 @@ mod tests {
                 worker_proto::MetricsSnapshot { metrics },
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionEventArm::MetricsSnapshot(_)));
+        let result = ExecutionEvent::try_from(wire).unwrap();
+        assert!(matches!(result, ExecutionEvent::MetricsSnapshot(_)));
     }
 
     #[test]
@@ -464,14 +694,14 @@ mod tests {
                 worker_proto::EndOfStream {},
             )),
         };
-        let result = ExecutionEventArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionEventArm::EndOfStream(_)));
+        let result = ExecutionEvent::try_from(wire).unwrap();
+        assert!(matches!(result, ExecutionEvent::EndOfStream(_)));
     }
 
     #[test]
     fn execution_event_rejects_unset_oneof() {
         let wire = worker_proto::ExecutionEvent { arm: None };
-        let result = ExecutionEventArm::try_from(wire);
+        let result = ExecutionEvent::try_from(wire);
         assert_eq!(result, Err(ConversionError::UnsetExecutionEventOneof));
     }
 
@@ -486,8 +716,8 @@ mod tests {
                 },
             )),
         };
-        let result = ExecutionResponseArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionResponseArm::Event(_)));
+        let result = ResponseFrame::try_from(wire).unwrap();
+        assert!(matches!(result, ResponseFrame::Event(_)));
     }
 
     #[test]
@@ -496,20 +726,23 @@ mod tests {
             payload: Some(worker_proto::execution_response::Payload::Report(
                 worker_proto::ExecutionReport {
                     final_phase: worker_proto::ExecutionPhase::Completed as i32,
-                    duration: None,
+                    duration: Some(WireDuration {
+                        seconds: 3,
+                        nanos: 0,
+                    }),
                     trace_id: "trace-1".to_string(),
                     summary: "done".to_string(),
                 },
             )),
         };
-        let result = ExecutionResponseArm::try_from(wire).unwrap();
-        assert!(matches!(result, ExecutionResponseArm::Report(_)));
+        let result = ResponseFrame::try_from(wire).unwrap();
+        assert!(matches!(result, ResponseFrame::Report(_)));
     }
 
     #[test]
     fn execution_response_rejects_unset_oneof() {
         let wire = worker_proto::ExecutionResponse { payload: None };
-        let result = ExecutionResponseArm::try_from(wire);
+        let result = ResponseFrame::try_from(wire);
         assert_eq!(result, Err(ConversionError::UnsetExecutionResponseOneof));
     }
 
@@ -521,6 +754,8 @@ mod tests {
             ConversionError::MissingField("checkpoint_object_id"),
             ConversionError::UnsetExecutionEventOneof,
             ConversionError::UnsetExecutionResponseOneof,
+            ConversionError::UnspecifiedExecutionPhase,
+            ConversionError::NegativeDuration,
         ];
         for variant in variants {
             assert_eq!(variant.classify(), ErrorClass::Permanent);
@@ -531,5 +766,55 @@ mod tests {
     fn conversion_error_display_is_not_empty() {
         let err = ConversionError::MissingField("checkpoint_object_id");
         assert!(!format!("{err}").is_empty());
+    }
+
+    #[test]
+    fn unspecified_wire_execution_phase_is_rejected_and_classifies_permanent() {
+        let result = ExecutionPhase::try_from(worker_proto::ExecutionPhase::Unspecified);
+        assert_eq!(result, Err(ConversionError::UnspecifiedExecutionPhase));
+        assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
+    }
+
+    #[test]
+    fn negative_duration_is_rejected_and_classifies_permanent() {
+        let wire = worker_proto::AllocationContract {
+            max_execution_duration: Some(WireDuration {
+                seconds: -1,
+                nanos: 0,
+            }),
+        };
+        let result = AllocationContract::try_from(wire);
+        assert_eq!(result, Err(ConversionError::NegativeDuration));
+        assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
+    }
+
+    #[test]
+    fn missing_allocation_contract_is_rejected_and_classifies_permanent() {
+        let wire = worker_proto::ExecutionContext {
+            workload_id: Some(identity_proto::WorkloadId {
+                value: WorkloadId::new().to_string(),
+            }),
+            allocation_id: Some(identity_proto::AllocationId {
+                value: AllocationId::new().to_string(),
+            }),
+            allocation_contract: None,
+            dependencies: vec![],
+            security_context: Some(worker_proto::SecurityContext {
+                tenant_id: "tenant-1".to_string(),
+                principal_id: "principal-1".to_string(),
+                grant_scope: vec![],
+            }),
+            observability_context: Some(worker_proto::ObservabilityContext {
+                trace_id: "trace-1".to_string(),
+                span_id: "span-1".to_string(),
+            }),
+            execution_parameters: std::collections::HashMap::new(),
+        };
+        let result = ExecutionContext::try_from(wire);
+        assert_eq!(
+            result,
+            Err(ConversionError::MissingField("allocation_contract"))
+        );
+        assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
     }
 }
