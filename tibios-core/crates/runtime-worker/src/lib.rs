@@ -8,6 +8,7 @@
 mod adapters;
 mod error;
 pub mod execution;
+pub mod ports;
 
 pub use error::WorkerError;
 pub use execution::context::{
@@ -17,3 +18,4 @@ pub use execution::event::{
     CheckpointCreated, EndOfStream, ExecutionEvent, MetricsSnapshot, OutputChunk, Progress, Warning,
 };
 pub use execution::report::{CancelAck, ExecutionPhase, ExecutionPulse, ExecutionReport};
+pub use ports::{ChannelClosed, ExecutionChannel, WorkerService};
