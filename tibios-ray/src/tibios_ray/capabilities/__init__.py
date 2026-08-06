@@ -18,6 +18,7 @@ from tibios_ray.capabilities.embedding import EmbeddingProvider
 from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
+from tibios_ray.capabilities.rerank import RerankProvider
 
 __all__ = [
     "CapabilityCatalog",
@@ -29,4 +30,5 @@ __all__ = [
     "EmbeddingProvider",
     "ModelFamily",
     "NoBackendAvailableError",
+    "RerankProvider",
 ]

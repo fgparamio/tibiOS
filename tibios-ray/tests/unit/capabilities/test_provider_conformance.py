@@ -26,6 +26,7 @@ from tibios_ray.capabilities.embedding import EmbeddingProvider
 from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
+from tibios_ray.capabilities.rerank import RerankProvider
 from tibios_ray.execution.context import ExecutionContext
 from tibios_ray.execution.events import EndOfStream
 from tibios_ray.execution.report import ExecutionPhase
@@ -33,7 +34,11 @@ from tibios_ray.runtime.registry import CapabilityRegistry
 from tibios_ray.runtime.worker_runtime import WorkerRuntime
 from tibios_ray.testing import FakeExecutionContext, InMemoryExecutionChannel, ManualCancellation
 
-_PROVIDERS: tuple[CapabilityProvider, ...] = (ChatProvider(), EmbeddingProvider())
+_PROVIDERS: tuple[CapabilityProvider, ...] = (
+    ChatProvider(),
+    EmbeddingProvider(),
+    RerankProvider(),
+)
 
 # Family Label Convention (FLC, design.md CP5): lowercase, `_`-separated,
 # no dots/hyphens/slashes.

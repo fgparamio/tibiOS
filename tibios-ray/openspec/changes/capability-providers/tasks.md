@@ -54,13 +54,13 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 3.5 Update `capabilities/__init__.py` to export `EmbeddingProvider`
 - [x] 3.6 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
-## Slice 4 — Rerank Provider (PR 4)
+## Slice 4 — Rerank Provider (PR 4) — COMPLETE
 
-- [ ] 4.1 RED: `tests/unit/capabilities/test_rerank.py` — descriptor equality with families `bge_reranker`, `jina_reranker`; backend `onnxruntime`; all flags `False`
-- [ ] 4.2 GREEN: create `src/tibios_ray/capabilities/rerank.py` with `RERANK_DOCUMENTS_DESCRIPTOR` and `RerankProvider`
-- [ ] 4.3 Append `RerankProvider()` to `_PROVIDERS` tuple
-- [ ] 4.4 Update `capabilities/__init__.py` to export `RerankProvider`
-- [ ] 4.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
+- [x] 4.1 RED: `tests/unit/capabilities/test_rerank.py` — descriptor equality with families `bge_reranker`, `jina_reranker`; backend `onnxruntime`; all flags `False`
+- [x] 4.2 GREEN: create `src/tibios_ray/capabilities/rerank.py` with `RERANK_DOCUMENTS_DESCRIPTOR` and `RerankProvider`
+- [x] 4.3 Append `RerankProvider()` to `_PROVIDERS` tuple
+- [x] 4.4 Update `capabilities/__init__.py` to export `RerankProvider`
+- [x] 4.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
 ## Slice 5 — Vision Provider (PR 5)
 
