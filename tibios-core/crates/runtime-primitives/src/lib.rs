@@ -14,7 +14,7 @@ mod lease;
 mod time;
 
 pub use content::ContentHash;
-pub use error::ErrorClass;
+pub use error::{Classify, ErrorClass};
 pub use identity::{
     AllocationId, IdentityParseError, NodeId, ObjectId, ObjectVersion, RuntimeId, SessionId,
     TenantId, WorkloadId,

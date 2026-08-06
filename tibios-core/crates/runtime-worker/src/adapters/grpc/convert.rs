@@ -8,7 +8,9 @@
 //! two oneofs (`ExecutionEvent`'s six arms, `ExecutionResponse`'s two
 //! arms). Worker domain types (`ExecutionContext`, `ExecutionReport`, and
 //! the rest of `18-worker-model.md`'s domain model) are out of scope — they
-//! do not exist yet and are not converted here.
+//! do not exist yet and are not converted here. `ConversionError` implements
+//! the public `runtime_primitives::Classify` trait directly; no private
+//! copy of that trait is defined in this crate.
 //!
 //! `dead_code` is allowed at module scope: this boundary is consumed by a
 //! future phase that wires the actual `WorkerExecution` RPCs (out of scope
@@ -69,16 +71,7 @@ impl core::fmt::Display for ConversionError {
     }
 }
 
-/// Local counterpart to `04-error-handling.md`'s `Classify` mapping trait.
-/// `runtime-primitives` has deliberately not added the public trait yet
-/// (`crates/runtime-primitives/src/error.rs`'s doc comment — "no public
-/// traits in this change"), so this boundary defines its own private copy,
-/// scoped to `ConversionError`, matching the documented shape exactly.
-trait Classify {
-    fn classify(&self) -> runtime_primitives::ErrorClass;
-}
-
-impl Classify for ConversionError {
+impl runtime_primitives::Classify for ConversionError {
     fn classify(&self) -> runtime_primitives::ErrorClass {
         match self {
             Self::InvalidUlid(..)
@@ -256,11 +249,11 @@ impl TryFrom<worker_proto::ExecutionResponse> for ExecutionResponseArm {
 #[cfg(test)]
 mod tests {
     use super::{
-        CheckpointCreated, Classify, ConversionError, ExecutionEventArm, ExecutionResponseArm,
+        CheckpointCreated, ConversionError, ExecutionEventArm, ExecutionResponseArm,
         identity_proto, worker_proto,
     };
     use runtime_primitives::{
-        AllocationId, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId,
+        AllocationId, Classify, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId,
     };
 
     #[test]
