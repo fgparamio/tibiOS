@@ -103,13 +103,19 @@ const EXTERNAL_ALLOWED: &[(&str, &[&str])] = &[
     ("runtime-deployment", &[]),
     ("runtime-api", &[]),
     ("runtime-federation", &[]),
-    ("runtime", &[]),
+    ("runtime", &["tokio"]),
 ];
 
 /// External crates whose presence signals generated transport code (design
 /// D6): allowed for exactly one crate, `runtime-worker` — see
 /// `transport_dependencies_are_allowlisted_for_exactly_one_crate`.
 const TRANSPORT_CRATES: &[&str] = &["prost", "tonic", "tonic-build"];
+
+/// External crates whose presence signals an async runtime dependency
+/// (`runtime-composition-root/spec.md` — "Runtime Is The Sole Crate
+/// Permitted An Async Runtime Dependency"): allowed for exactly one crate,
+/// `runtime` — see `async_runtime_is_allowlisted_for_exactly_one_crate`.
+const ASYNC_RUNTIME_CRATES: &[&str] = &["tokio"];
 
 /// Every expected workspace member, including `runtime` itself.
 const EXPECTED_MEMBERS: &[&str] = &[
@@ -347,6 +353,28 @@ fn transport_dependencies_are_allowlisted_for_exactly_one_crate() {
             owning_rows,
             vec!["runtime-worker"],
             "expected `{transport_crate}` to be allowlisted for exactly `runtime-worker`, found: {owning_rows:?}"
+        );
+    }
+}
+
+/// Spec scenario "tokio is allowlisted for runtime alone"
+/// (`runtime-composition-root/spec.md`): table-only test (no `cargo
+/// metadata`), mirroring `transport_dependencies_are_allowlisted_for_exactly_one_crate`
+/// — guards the `EXTERNAL_ALLOWED` TABLE itself, catching a `tokio` entry
+/// pasted into a second row.
+#[test]
+fn async_runtime_is_allowlisted_for_exactly_one_crate() {
+    for async_runtime_crate in ASYNC_RUNTIME_CRATES {
+        let owning_rows: Vec<&str> = EXTERNAL_ALLOWED
+            .iter()
+            .filter(|(_, deps)| deps.contains(async_runtime_crate))
+            .map(|(name, _)| *name)
+            .collect();
+
+        assert_eq!(
+            owning_rows,
+            vec!["runtime"],
+            "expected `{async_runtime_crate}` to be allowlisted for exactly `runtime`, found: {owning_rows:?}"
         );
     }
 }

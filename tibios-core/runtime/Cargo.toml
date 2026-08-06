@@ -12,6 +12,7 @@ name = "runtime"
 path = "src/main.rs"
 
 [dependencies]
+tokio = { workspace = true }
 runtime-primitives = { workspace = true }
 runtime-object = { workspace = true }
 runtime-scheduler = { workspace = true }

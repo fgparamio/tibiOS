@@ -193,6 +193,35 @@ impl ExecutionContext {
     pub const fn workload_id(&self) -> WorkloadId {
         self.workload_id
     }
+
+    /// The carried tracing identifiers for this execution — additive,
+    /// read-only access so a `WorkerService` implementation can attach them
+    /// to the `ExecutionReport` it owes (`worker-composition-root/design.md`
+    /// D4). Zero new dependencies, zero behavior change: this is an
+    /// approved deviation from this change's own proposal, not a
+    /// reinterpretation of the field.
+    #[must_use]
+    pub const fn observability_context(&self) -> &ObservabilityContext {
+        &self.observability_context
+    }
+
+    /// The execution-scoped allocation contract carried by this context —
+    /// additive, read-only access (`worker-composition-root/design.md` D4).
+    /// `AllocationContract` is `Copy`, so this returns by value, mirroring
+    /// `workload_id`'s own accessor shape.
+    #[must_use]
+    pub const fn allocation_contract(&self) -> AllocationContract {
+        self.allocation_contract
+    }
+
+    /// The carried, opaque execution parameters — additive, read-only
+    /// access (`worker-composition-root/design.md` D4). Never interpreted
+    /// by this accessor; a `WorkerService` implementation decides what, if
+    /// anything, each key means.
+    #[must_use]
+    pub const fn execution_parameters(&self) -> &BTreeMap<String, String> {
+        &self.execution_parameters
+    }
 }
 
 #[cfg(test)]
@@ -236,6 +265,34 @@ mod tests {
         let original = sample_context(WorkloadId::new());
         let cloned = original.clone();
         assert_eq!(original, cloned);
+    }
+
+    #[test]
+    fn execution_context_observability_context_accessor_returns_the_carried_value_verbatim() {
+        let context = sample_context(WorkloadId::new());
+
+        assert_eq!(context.observability_context().trace_id(), "trace-1");
+        assert_eq!(context.observability_context().span_id(), "span-1");
+    }
+
+    #[test]
+    fn execution_context_allocation_contract_accessor_returns_the_carried_value_verbatim() {
+        let context = sample_context(WorkloadId::new());
+
+        assert_eq!(
+            context.allocation_contract(),
+            AllocationContract::new(core::time::Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn execution_context_execution_parameters_accessor_returns_the_carried_map_verbatim() {
+        let context = sample_context(WorkloadId::new());
+
+        assert_eq!(
+            context.execution_parameters().get("temperature"),
+            Some(&"0.7".to_string())
+        );
     }
 
     #[test]

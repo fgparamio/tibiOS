@@ -9,4 +9,6 @@
 //!
 //! Wiring is deferred to a follow-up change — this is a stub.
 
+mod worker;
+
 fn main() {}

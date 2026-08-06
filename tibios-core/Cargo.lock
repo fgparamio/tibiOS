@@ -724,6 +724,7 @@ dependencies = [
  "runtime-state",
  "runtime-storage",
  "runtime-worker",
+ "tokio",
 ]
 
 [[package]]
