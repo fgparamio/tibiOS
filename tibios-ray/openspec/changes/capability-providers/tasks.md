@@ -45,14 +45,14 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 2.4 Update `capabilities/__init__.py` to export `ChatProvider`
 - [x] 2.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
-## Slice 3 — Embedding Provider + whole-catalog harness (PR 3)
+## Slice 3 — Embedding Provider + whole-catalog harness (PR 3) — COMPLETE
 
-- [ ] 3.1 RED: `tests/unit/capabilities/test_catalog_conformance.py` — co-registration (no `DuplicateCapabilityError`/`EmptyCatalogError`), aggregated catalog union, round-trip `resolve()`, exact capability-string set, AST no-branching scan, AST layering scan (`capabilities/` imports nothing from `runtime/`) (spec: Joint Registration Without Rejection, Binding Invariants)
-- [ ] 3.2 RED: `tests/unit/capabilities/test_embedding.py` — descriptor equality with families `bge`, `nomic_embed`, `e5`, `jina_embeddings`; backend `onnxruntime`; all flags `False`
-- [ ] 3.3 GREEN: create `src/tibios_ray/capabilities/embedding.py` with `EMBEDDING_GENERATE_DESCRIPTOR` and `EmbeddingProvider` (no `flags` arg — default `CapabilityFlags()`)
-- [ ] 3.4 Append `EmbeddingProvider()` to `_PROVIDERS` tuple in `test_provider_conformance.py`
-- [ ] 3.5 Update `capabilities/__init__.py` to export `EmbeddingProvider`
-- [ ] 3.6 Verify: `uv run pytest && uv run ruff check && uv run pyright`
+- [x] 3.1 RED: `tests/unit/capabilities/test_catalog_conformance.py` — co-registration (no `DuplicateCapabilityError`/`EmptyCatalogError`), aggregated catalog union, round-trip `resolve()`, exact capability-string set, AST no-branching scan, AST layering scan (`capabilities/` imports nothing from `runtime/`) (spec: Joint Registration Without Rejection, Binding Invariants)
+- [x] 3.2 RED: `tests/unit/capabilities/test_embedding.py` — descriptor equality with families `bge`, `nomic_embed`, `e5`, `jina_embeddings`; backend `onnxruntime`; all flags `False`
+- [x] 3.3 GREEN: create `src/tibios_ray/capabilities/embedding.py` with `EMBEDDING_GENERATE_DESCRIPTOR` and `EmbeddingProvider` (no `flags` arg — default `CapabilityFlags()`)
+- [x] 3.4 Append `EmbeddingProvider()` to `_PROVIDERS` tuple in `test_provider_conformance.py`
+- [x] 3.5 Update `capabilities/__init__.py` to export `EmbeddingProvider`
+- [x] 3.6 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
 ## Slice 4 — Rerank Provider (PR 4)
 

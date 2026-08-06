@@ -22,6 +22,7 @@ import pytest
 from tibios_ray.backends.adapter import BackendId
 from tibios_ray.capabilities.chat import ChatProvider
 from tibios_ray.capabilities.descriptor import ModelFamily
+from tibios_ray.capabilities.embedding import EmbeddingProvider
 from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.provider import CapabilityProvider
@@ -32,7 +33,7 @@ from tibios_ray.runtime.registry import CapabilityRegistry
 from tibios_ray.runtime.worker_runtime import WorkerRuntime
 from tibios_ray.testing import FakeExecutionContext, InMemoryExecutionChannel, ManualCancellation
 
-_PROVIDERS: tuple[CapabilityProvider, ...] = (ChatProvider(),)
+_PROVIDERS: tuple[CapabilityProvider, ...] = (ChatProvider(), EmbeddingProvider())
 
 # Family Label Convention (FLC, design.md CP5): lowercase, `_`-separated,
 # no dots/hyphens/slashes.
