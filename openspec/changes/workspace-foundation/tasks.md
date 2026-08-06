@@ -40,12 +40,12 @@ Chain strategy: pending
 
 Each task = `Cargo.toml` (allowed deps only) + `src/lib.rs` doc stub; satisfies that crate's own spec (`Exhaustive Dependency Set` + `Stub Crate, No Public Traits`).
 
-- [ ] 3.1 `runtime-object` — dep: primitives; cites `13`,`23`.
-- [ ] 3.2 `runtime-network` — dep: primitives; cites `22`.
-- [ ] 3.3 `runtime-storage` — dep: primitives; cites `21`.
-- [ ] 3.4 `runtime-security` — dep: primitives; cites `08`.
-- [ ] 3.5 `runtime-observability` — dep: primitives; cites `09`.
-- [ ] 3.6 `runtime-deployment` — dep: primitives ONLY; cites `29`.
+- [x] 3.1 `runtime-object` — dep: primitives; cites `13`,`23`.
+- [x] 3.2 `runtime-network` — dep: primitives; cites `22`.
+- [x] 3.3 `runtime-storage` — dep: primitives; cites `21`.
+- [x] 3.4 `runtime-security` — dep: primitives; cites `08`.
+- [x] 3.5 `runtime-observability` — dep: primitives; cites `09`.
+- [x] 3.6 `runtime-deployment` — dep: primitives ONLY; cites `29`.
 - [ ] 3.7 `runtime-scheduler` — deps: primitives, object; cites `14`,`16`.
 - [ ] 3.8 `runtime-state` — deps: primitives, object, scheduler, network; cites `17`,`19`; doc-note network edge is data-contract-only (Runtime Events, never Transport/Session).
 - [ ] 3.9 `runtime-allocation` — deps: primitives, scheduler, object; cites `15`.
