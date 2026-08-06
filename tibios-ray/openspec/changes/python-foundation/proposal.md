@@ -69,7 +69,17 @@ Revert the single commit. All changes are additive (two stub files, one test fil
 
 ## Success Criteria
 
-- [ ] `uv run pytest` passes
-- [ ] `uv run ruff check` passes
-- [ ] `uv run pyright` passes
-- [ ] `src/tibios_ray/{server,worker}.py` exist with docstrings only — zero business logic
+- [x] `uv run pytest` passes
+- [x] `uv run ruff check` passes
+- [x] `uv run pyright` passes
+- [x] `src/tibios_ray/{server,worker}.py` exist with docstrings only — zero business logic
+
+## Applied
+
+Applied directly (not through the full spec/design/tasks pipeline — user explicitly
+requested a direct apply given the small, mechanical scope). `pytest`, `ruff`, `pyright`
+added as dev dependencies; `[tool.ruff]`/`[tool.pyright]` configured in `pyproject.toml`;
+`src/tibios_ray/{server,worker}.py` created as docstring-only stubs (`worker.py`'s
+docstring already uses the `Capability Provider` terminology settled in
+`ray-worker-runtime`, per that proposal's Risks note); `tests/test_smoke.py` added. All
+three Success Criteria commands verified passing.
