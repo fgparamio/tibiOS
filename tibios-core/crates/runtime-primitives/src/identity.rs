@@ -129,4 +129,10 @@ mod tests {
         assert_ne!(v0, v1);
         assert_eq!(v1.next(), v0.next().next());
     }
+
+    #[test]
+    fn next_is_strictly_greater_than_default() {
+        let v = ObjectVersion::default();
+        assert!(v.next() > v);
+    }
 }

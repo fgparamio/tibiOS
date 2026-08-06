@@ -51,6 +51,13 @@ mod tests {
     fn is_expired_true_once_now_reaches_expiry() {
         let lease = Lease::new(Timestamp::from_millis(1_000));
         assert!(lease.is_expired(Timestamp::from_millis(1_000)));
+        assert!(lease.is_expired(Timestamp::from_millis(1_500)));
+    }
+
+    #[test]
+    fn is_expired_false_before_expiry() {
+        let lease = Lease::new(Timestamp::from_millis(1_000));
+        assert!(!lease.is_expired(Timestamp::from_millis(999)));
     }
 
     #[test]
@@ -59,6 +66,15 @@ mod tests {
         assert_eq!(
             lease.remaining(Timestamp::from_millis(400)),
             Duration::from_millis(600)
+        );
+    }
+
+    #[test]
+    fn remaining_is_zero_once_expired() {
+        let lease = Lease::new(Timestamp::from_millis(1_000));
+        assert_eq!(
+            lease.remaining(Timestamp::from_millis(1_500)),
+            Duration::ZERO
         );
     }
 }
