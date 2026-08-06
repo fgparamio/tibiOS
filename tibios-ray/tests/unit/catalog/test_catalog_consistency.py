@@ -136,7 +136,8 @@ class TestAllEntriesAssembly:
         # MC12, confirmed in Phase 4/6) -- assembling every group
         # together must not accidentally duplicate it either. Verified
         # here, not merely assumed from the individual groups' isolation.
-        gemma_names = [entry.name.value for entry in ALL_ENTRIES if entry.family == ModelFamily("gemma")]
+        gemma = ModelFamily("gemma")
+        gemma_names = [entry.name.value for entry in ALL_ENTRIES if entry.family == gemma]
         assert len(gemma_names) == len(set(gemma_names))
         assert sorted(gemma_names) == [
             "google/gemma-3-12b-it",
