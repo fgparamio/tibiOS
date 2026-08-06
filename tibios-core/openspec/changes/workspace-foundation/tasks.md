@@ -57,13 +57,13 @@ Each task = `Cargo.toml` (allowed deps only) + `src/lib.rs` doc stub; satisfies 
 
 ## Phase 4: Composition Root + Architecture Guard (TDD)
 
-- [ ] 4.1 Create `runtime/Cargo.toml` (bin, deps: all 15 domain crates, `[dev-dependencies] cargo_metadata`) + `runtime/src/main.rs` stub citing `02-project-structure.md` Composition Root section. *(Golden Rule; No Public Traits In This Change)*
-- [ ] 4.2 RED: write `runtime/tests/architecture_guard.rs` with the 16-name member-set assertion and an `ALLOWED` matrix deliberately missing one edge (e.g. `allocation→scheduler`); run `cargo test -p runtime`, confirm it fails naming the missing dependency.
-- [ ] 4.3 GREEN: correct `ALLOWED` to the exact final Allowed Edge Matrix (design doc); confirm `cargo test -p runtime` passes, including member-set and `runtime-primitives` external-allowlist assertions. *(Architecture Guard Enforces The Dependency Matrix; Hosts The Architecture Guard)*
-- [ ] 4.4 Meta-verify: temporarily add `runtime-deployment → runtime-object`, confirm `cargo test --workspace` fails naming the unexpected dep, then revert. *(Scenario: Drift is caught)*
-- [ ] 4.5 Meta-verify: temporarily drop `runtime-scheduler`'s dep on `runtime-object`, confirm failure naming the missing dep, then revert; confirm no violation is reported for `runtime`'s own full dependency set. *(Scenario: Missing required edge is caught; No crate depends on runtime)*
+- [x] 4.1 Create `runtime/Cargo.toml` (bin, deps: all 15 domain crates, `[dev-dependencies] cargo_metadata`) + `runtime/src/main.rs` stub citing `02-project-structure.md` Composition Root section. *(Golden Rule; No Public Traits In This Change)*
+- [x] 4.2 RED: write `runtime/tests/architecture_guard.rs` with the 16-name member-set assertion and an `ALLOWED` matrix deliberately missing one edge (e.g. `allocation→scheduler`); run `cargo test -p runtime`, confirm it fails naming the missing dependency.
+- [x] 4.3 GREEN: correct `ALLOWED` to the exact final Allowed Edge Matrix (design doc); confirm `cargo test -p runtime` passes, including member-set and `runtime-primitives` external-allowlist assertions. *(Architecture Guard Enforces The Dependency Matrix; Hosts The Architecture Guard)*
+- [x] 4.4 Meta-verify: temporarily add `runtime-deployment → runtime-object`, confirm `cargo test --workspace` fails naming the unexpected dep, then revert. *(Scenario: Drift is caught)* — implemented as `guard_logic_catches_an_unexpected_edge`, a permanent unit test against the extracted `diff_dependencies()` comparison function with a synthetic actual/allowed pair, rather than a one-off manual mutation of a real crate; runs on every `cargo test` instead of only once by hand.
+- [x] 4.5 Meta-verify: temporarily drop `runtime-scheduler`'s dep on `runtime-object`, confirm failure naming the missing dep, then revert; confirm no violation is reported for `runtime`'s own full dependency set. *(Scenario: Missing required edge is caught; No crate depends on runtime)* — implemented as `guard_logic_catches_a_missing_edge` (same synthetic-data approach) plus `runtime_depends_on_all_domain_crates_without_violation`, which asserts `runtime`'s real dependency set equals all 15 domain crates and that `runtime` never appears in the narrow-dependency `ALLOWED` matrix.
 
 ## Phase 5: Workspace-Wide Verification
 
-- [ ] 5.1 Run `cargo fmt` across the workspace; confirm `cargo fmt --check` passes.
-- [ ] 5.2 Run `cargo check --workspace`, `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`; fix any fallout (e.g. `missing_docs`) until all four success-criteria commands are green.
+- [x] 5.1 Run `cargo fmt` across the workspace; confirm `cargo fmt --check` passes.
+- [x] 5.2 Run `cargo check --workspace`, `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`; fix any fallout (e.g. `missing_docs`) until all four success-criteria commands are green. — All four passed with zero fallout on the first run (no stub fixups were needed; PR2 had already confirmed `runtime-primitives` was the only missing piece).
