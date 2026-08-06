@@ -14,11 +14,11 @@ type-checked by `uv run pyright`, which is included via `pyproject.toml`
 `# type: ignore[arg-type]` below suppresses the *expected* argument-type
 error where a raw `str` is passed where `ModelSelectionPolicy.plan`
 requires a `ResolvedModelRef`. `pyproject.toml` sets
-`reportUnnecessaryTypeIgnore = true`: if `plan`'s signature is ever
+`reportUnnecessaryTypeIgnoreComment = true`: if `plan`'s signature is ever
 loosened to also accept `str` (readmitting family-string discovery), the
 underlying argument-type error disappears, the ignore comment becomes
 unnecessary, and `uv run pyright` fails the build on
-`reportUnnecessaryTypeIgnore` — turning a silent architecture regression
+`reportUnnecessaryTypeIgnoreComment` — turning a silent architecture regression
 into a hard CI failure instead of a comment nobody notices.
 """
 

@@ -14,13 +14,13 @@ The Worker Runtime MUST drive the full Worker Contract lifecycle (Execution Cont
 
 - GIVEN an Execution Context accepted by the Worker Runtime
 - WHEN the dispatched Capability Provider finishes work
-- THEN the Worker Runtime emits Events and a final Report through the Channel
+- THEN the Worker Runtime emits Events through the Channel during execution, emits a terminal `EndOfStream` event to signal the Channel is done, and returns the final Report directly from `execute()` — the Report is never itself sent through the Channel (`"Execution produces events. Completion produces a report."`, `18-worker-model.md`)
 
 #### Scenario: Cancellation propagates to the active execution
 
 - GIVEN an execution in progress
 - WHEN a cancellation signal (Pulse) is received
-- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider and closes the Channel per the Worker Contract
+- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider, emits final Events and a terminal `EndOfStream` on the Channel, and returns the Report per the Worker Contract
 
 ### Requirement: Dispatch Only via Capability Registry
 
