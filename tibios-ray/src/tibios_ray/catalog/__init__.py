@@ -9,6 +9,7 @@ and is reached by importing `tibios_ray.catalog.entries` explicitly, not
 through this package root.
 """
 
+from tibios_ray.catalog.catalog import ModelCatalog
 from tibios_ray.catalog.errors import (
     AmbiguousFootprintError,
     CatalogError,
@@ -18,14 +19,18 @@ from tibios_ray.catalog.errors import (
     UnknownModelError,
     UnsupportedServingError,
 )
+from tibios_ray.catalog.model import BackendSupport, ModelDescriptor
 from tibios_ray.catalog.names import PublishedModelName, family_of
 
 __all__ = [
     "AmbiguousFootprintError",
+    "BackendSupport",
     "CatalogError",
     "DuplicateModelError",
     "FamilyDerivationError",
     "FamilyMismatchError",
+    "ModelCatalog",
+    "ModelDescriptor",
     "PublishedModelName",
     "UnknownModelError",
     "UnsupportedServingError",
