@@ -74,10 +74,10 @@ Chain strategy: stacked-to-main
 - [x] 5.4 `tests/unit/runtime/`: success lifecycle, unknown capability -> Failed report (no exception), malformed capability string -> Failed report (no exception), cancellation -> ack+cleanup+final events+report, duplicate-capability rejection, empty-catalog rejection, aggregated catalog — done 2026-08-06, 17/17 new tests passing (152/152 total), ruff+pyright clean
 - [x] 5.5 Naming audit test (`tests/unit/runtime/test_naming_audit.py`, AST-identifier based, permanent): `capabilities/`, `selection/`, `backends/` zero "Worker" identifiers; `runtime/` exempt only for `WorkerRuntime` — done, mutation-verified (temporarily injected a `Worker`-named identifier, confirmed the test fails, reverted, confirmed green again)
 
-## Phase 6: testing/ shared fakes (PR 6)
+## Phase 6: testing/ shared fakes (PR 6) — COMPLETE 2026-08-06
 
-- [ ] 6.1 `InMemoryExecutionChannel`, `FakeExecutionContext`, `ManualCancellation`, `StubProvider`, `RecordingBackend`
-- [ ] 6.2 Retrofit Phase 1-5 ad-hoc test doubles to import from `testing/` (dedupe)
+- [x] 6.1 `InMemoryExecutionChannel`, `FakeExecutionContext`, `ManualCancellation`, `StubProvider`, `RecordingBackend` — done, RED-first (`tests/unit/testing/`: 22 new tests, all failed with `ModuleNotFoundError` before `src/tibios_ray/testing/` existed), then GREEN (174/174 total), ruff+pyright clean. Naming audit (Phase 5) extended to also scan `testing/` (zero exemptions), mutation-verified.
+- [x] 6.2 Retrofit Phase 1-5 ad-hoc test doubles to import from `testing/` (dedupe) — done, 6 files retrofitted one at a time (`tests/unit/execution/test_channel.py`, `tests/unit/execution/test_context.py`, `tests/unit/capabilities/test_provider.py`, `tests/unit/runtime/test_registry.py`, `tests/unit/runtime/test_worker_runtime.py`, `tests/unit/backends/test_adapter.py`), full suite re-run green after each swap, no assertions changed (174/174 total throughout), ruff+pyright clean.
 
 ## Phase 7: wiring + docs (PR 7)
 
