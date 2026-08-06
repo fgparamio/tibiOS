@@ -95,13 +95,13 @@ both resolution-type guards + pyright fixture, ~359 changed lines).
 - [x] 3.4 `tests/unit/catalog/test_chat_entries.py`: RED-first — local `ModelCatalog(CHAT_ENTRIES)` fixture scoped to this slice's own data (MC14 — shared `entries/__init__.py` assembly is deferred to slice 8); family coverage for `qwen`/`llama`/`deepseek`; one full `ModelDescriptor` equality per family as the stability assertion; derivation round-trip `entry.family == family_of(entry.name)` for every name in this slice
 - [x] 3.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
-## Phase 4: chat B — gemma, mistral, kimi (PR 4)
+## Phase 4: chat B — gemma, mistral, kimi (PR 4) — COMPLETE
 
-- [ ] 4.1 `catalog/entries/chat.py` (append): `gemma` family — 3 entries (`gemma-3-4b-it`, `gemma-3-12b-it`, `gemma-3-27b-it`). These three rows are also the *entire* `gemma` answer for `vision.understand` (MC8/MC12) — `entries/vision.py` (slice 6) must not restate them.
-- [ ] 4.2 `catalog/entries/chat.py` (append): `mistral` family — 2 entries (`Mistral-7B-Instruct-v0.3`, `Mistral-Small-3.2-24B-Instruct-2506`)
-- [ ] 4.3 `catalog/entries/chat.py` (append): `kimi` family — 1 entry (`Kimi-K2-Instruct`), satisfying "≥1 entry per advertised family". `moonshotai/Kimi-VL-A3B-Instruct` (-> `kimi_vl`) is intentionally out of scope — no Provider advertises `kimi_vl`.
-- [ ] 4.4 `tests/unit/catalog/test_chat_entries.py`: extend with `gemma`/`mistral`/`kimi` coverage, same pattern as 3.4 (family coverage, one full-equality stability assertion per family, derivation round-trip)
-- [ ] 4.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
+- [x] 4.1 `catalog/entries/chat.py` (append): `gemma` family — 3 entries (`gemma-3-4b-it`, `gemma-3-12b-it`, `gemma-3-27b-it`). These three rows are also the *entire* `gemma` answer for `vision.understand` (MC8/MC12) — `entries/vision.py` (slice 6) must not restate them.
+- [x] 4.2 `catalog/entries/chat.py` (append): `mistral` family — 2 entries (`Mistral-7B-Instruct-v0.3`, `Mistral-Small-3.2-24B-Instruct-2506`)
+- [x] 4.3 `catalog/entries/chat.py` (append): `kimi` family — 1 entry (`Kimi-K2-Instruct`), satisfying "≥1 entry per advertised family". `moonshotai/Kimi-VL-A3B-Instruct` (-> `kimi_vl`) is intentionally out of scope — no Provider advertises `kimi_vl`.
+- [x] 4.4 `tests/unit/catalog/test_chat_entries.py`: extend with `gemma`/`mistral`/`kimi` coverage, same pattern as 3.4 (family coverage, one full-equality stability assertion per family, derivation round-trip)
+- [x] 4.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
 ## Phase 5: embedding + rerank (PR 5)
 
