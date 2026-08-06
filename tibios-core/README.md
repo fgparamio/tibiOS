@@ -38,11 +38,14 @@ in-progress changes so far:
 |---|---|---|
 | `workspace-foundation` | Archived (`openspec/changes/archive/2026-08-06-workspace-foundation/`) | The 16-crate Cargo workspace skeleton, the 12 `runtime-primitives` fundamental types, and the machine-enforced dependency graph. |
 | `proto-worker-contract` | Archived (`openspec/changes/archive/2026-08-06-proto-worker-contract/`) | The language-neutral `.proto` projection of the Worker Contract (`18-worker-model.md`), shared with `tibios-ray` via the monorepo's `proto/` directory. |
-| `worker-grpc-adapter` | **In progress** (`openspec/changes/worker-grpc-adapter/`, not yet archived) | Rust codegen wiring for that contract inside `runtime-worker`: `build.rs`, a private `adapters/` module, a fallible wire↔domain conversion layer, and the containment tests that keep generated code out of the public API. Code is committed; it has not yet been through `sdd-verify` / `sdd-archive`. |
+| `worker-grpc-adapter` | Archived (`openspec/changes/archive/2026-08-06-worker-grpc-adapter/`) | Rust codegen wiring for that contract inside `runtime-worker`: `build.rs`, a private `adapters/` module, a fallible wire↔domain conversion layer, and the containment tests that keep generated code out of the public API. |
+| `worker-inbound-port` | Archived (`openspec/changes/archive/2026-08-06-worker-inbound-port/`) | The `WorkerService`/`ExecutionChannel` inbound port in `runtime-worker`, its `ExecutionEvent`/`WorkerError` data families, and retargeting `convert.rs` to the real domain types instead of local mirrors. |
 
 The concrete capabilities this codebase actually implements and has verified
 are recorded as specs of record under `openspec/specs/` — that directory,
 not this README, is the source of truth for "what is built today."
+
+**Current status, relative to `tibios-ray`:** `tibios-core` has completed its architecture (frozen at `architecture-v1.0`) and currently provides the public contracts and project skeleton — 12 of its 15 domain crates remain intentionally unimplemented stubs. `tibios-ray` is the first reference implementation of the Worker Contract, so it carries a more developed internal domain model despite covering a narrower architectural scope. Neither side has a real inference engine or an end-to-end gRPC connection wired up yet.
 
 ## Monorepo layout
 
