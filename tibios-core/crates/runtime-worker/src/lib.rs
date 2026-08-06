@@ -12,7 +12,7 @@ pub mod ports;
 
 pub use error::WorkerError;
 pub use execution::context::{
-    ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext,
+    ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext, WorkerCapability,
 };
 pub use execution::event::{
     CheckpointCreated, EndOfStream, ExecutionEvent, MetricsSnapshot, OutputChunk, Progress, Warning,

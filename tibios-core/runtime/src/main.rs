@@ -25,7 +25,8 @@ use std::time::Duration;
 use runtime_allocation::AllocationContract;
 use runtime_primitives::{AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId};
 use runtime_worker::{
-    ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext, WorkerService,
+    ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext, WorkerCapability,
+    WorkerService,
 };
 use tokio::sync::mpsc;
 use worker::MpscExecutionChannel;
@@ -55,6 +56,7 @@ fn demo_context() -> ExecutionContext {
         ),
         ObservabilityContext::new("trace-demo", "span-demo"),
         BTreeMap::new(),
+        WorkerCapability::new("chat.generate"),
     )
 }
 

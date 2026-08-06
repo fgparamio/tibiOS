@@ -275,6 +275,25 @@ impl TryFrom<worker_proto::ResolvedModelRef> for crate::execution::context::Reso
     }
 }
 
+impl From<crate::execution::context::WorkerCapability> for worker_proto::WorkerCapability {
+    fn from(value: crate::execution::context::WorkerCapability) -> Self {
+        Self {
+            value: value.name().to_string(),
+        }
+    }
+}
+
+impl TryFrom<worker_proto::WorkerCapability> for crate::execution::context::WorkerCapability {
+    type Error = ConversionError;
+
+    fn try_from(value: worker_proto::WorkerCapability) -> Result<Self, Self::Error> {
+        if value.value.is_empty() {
+            return Err(ConversionError::MissingField("worker_capability"));
+        }
+        Ok(Self::new(value.value))
+    }
+}
+
 impl From<worker_proto::SecurityContext> for crate::execution::context::SecurityContext {
     fn from(value: worker_proto::SecurityContext) -> Self {
         Self::new(value.tenant_id, value.principal_id, value.grant_scope)
@@ -321,6 +340,10 @@ impl TryFrom<worker_proto::ExecutionContext> for crate::execution::context::Exec
         // String>` (D10 Consequences), a plain re-keying with no fallible
         // step (`tasks.md` 5a.10).
         let execution_parameters = value.execution_parameters.into_iter().collect();
+        let worker_capability = value
+            .worker_capability
+            .ok_or(ConversionError::MissingField("worker_capability"))?
+            .try_into()?;
 
         Ok(Self::new(
             workload_id,
@@ -330,6 +353,7 @@ impl TryFrom<worker_proto::ExecutionContext> for crate::execution::context::Exec
             security_context,
             observability_context,
             execution_parameters,
+            worker_capability,
         ))
     }
 }
@@ -478,7 +502,7 @@ impl TryFrom<worker_proto::ExecutionResponse> for ResponseFrame {
 #[cfg(test)]
 mod tests {
     use super::{ConversionError, ResponseFrame, WireDuration, identity_proto, worker_proto};
-    use crate::execution::context::ExecutionContext;
+    use crate::execution::context::{ExecutionContext, WorkerCapability};
     use crate::execution::event::{CheckpointCreated, ExecutionEvent};
     use crate::execution::report::ExecutionPhase;
     use runtime_allocation::AllocationContract;
@@ -575,6 +599,38 @@ mod tests {
         let wire: identity_proto::ContentHash = original.clone().into();
         let parsed = ContentHash::try_from(wire).unwrap();
         assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn worker_capability_round_trips_through_wire() {
+        let original = WorkerCapability::new("chat.generate");
+        let wire: worker_proto::WorkerCapability = original.clone().into();
+        let parsed = WorkerCapability::try_from(wire).unwrap();
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn worker_capability_rejects_unset_message() {
+        let wire = worker_proto::WorkerCapability {
+            value: String::new(),
+        };
+        let result = WorkerCapability::try_from(wire);
+        assert_eq!(
+            result,
+            Err(ConversionError::MissingField("worker_capability"))
+        );
+    }
+
+    #[test]
+    fn worker_capability_rejects_empty_value() {
+        let wire = worker_proto::WorkerCapability {
+            value: String::new(),
+        };
+        let result = WorkerCapability::try_from(wire);
+        assert_eq!(
+            result,
+            Err(ConversionError::MissingField("worker_capability"))
+        );
     }
 
     #[test]
@@ -785,6 +841,80 @@ mod tests {
         };
         let result = AllocationContract::try_from(wire);
         assert_eq!(result, Err(ConversionError::NegativeDuration));
+        assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
+    }
+
+    #[test]
+    fn execution_context_missing_worker_capability_is_rejected_and_classifies_permanent() {
+        let wire = worker_proto::ExecutionContext {
+            workload_id: Some(identity_proto::WorkloadId {
+                value: WorkloadId::new().to_string(),
+            }),
+            allocation_id: Some(identity_proto::AllocationId {
+                value: AllocationId::new().to_string(),
+            }),
+            allocation_contract: Some(worker_proto::AllocationContract {
+                max_execution_duration: Some(WireDuration {
+                    seconds: 30,
+                    nanos: 0,
+                }),
+            }),
+            dependencies: vec![],
+            security_context: Some(worker_proto::SecurityContext {
+                tenant_id: "tenant-1".to_string(),
+                principal_id: "principal-1".to_string(),
+                grant_scope: vec![],
+            }),
+            observability_context: Some(worker_proto::ObservabilityContext {
+                trace_id: "trace-1".to_string(),
+                span_id: "span-1".to_string(),
+            }),
+            execution_parameters: std::collections::HashMap::new(),
+            worker_capability: None,
+        };
+        let result = ExecutionContext::try_from(wire);
+        assert_eq!(
+            result,
+            Err(ConversionError::MissingField("worker_capability"))
+        );
+        assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
+    }
+
+    #[test]
+    fn execution_context_empty_worker_capability_is_rejected_and_classifies_permanent() {
+        let wire = worker_proto::ExecutionContext {
+            workload_id: Some(identity_proto::WorkloadId {
+                value: WorkloadId::new().to_string(),
+            }),
+            allocation_id: Some(identity_proto::AllocationId {
+                value: AllocationId::new().to_string(),
+            }),
+            allocation_contract: Some(worker_proto::AllocationContract {
+                max_execution_duration: Some(WireDuration {
+                    seconds: 30,
+                    nanos: 0,
+                }),
+            }),
+            dependencies: vec![],
+            security_context: Some(worker_proto::SecurityContext {
+                tenant_id: "tenant-1".to_string(),
+                principal_id: "principal-1".to_string(),
+                grant_scope: vec![],
+            }),
+            observability_context: Some(worker_proto::ObservabilityContext {
+                trace_id: "trace-1".to_string(),
+                span_id: "span-1".to_string(),
+            }),
+            execution_parameters: std::collections::HashMap::new(),
+            worker_capability: Some(worker_proto::WorkerCapability {
+                value: String::new(),
+            }),
+        };
+        let result = ExecutionContext::try_from(wire);
+        assert_eq!(
+            result,
+            Err(ConversionError::MissingField("worker_capability"))
+        );
         assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
     }
 

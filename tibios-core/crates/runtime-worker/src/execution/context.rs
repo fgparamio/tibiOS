@@ -144,6 +144,28 @@ impl ObservabilityContext {
     }
 }
 
+/// The behavior one execution requests the Worker perform (e.g.
+/// `chat.generate`), so a Worker fronting several providers can dispatch to
+/// the right one (`18-worker-model.md:52`). Deliberately distinct from the
+/// hardware/platform Capability of `14-resource-model.md` — same word,
+/// different concept, disambiguated in `GLOSSARY.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WorkerCapability(String);
+
+impl WorkerCapability {
+    /// Builds a `WorkerCapability` from the requested behavior's name.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(name.into())
+    }
+
+    /// The carried behavior name, verbatim.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
 /// The immutable input a Worker receives to perform one execution
 /// (`18-worker-model.md:52`). Deliberately excludes the Execution Channel
 /// and any cancellation signal — both arrive as separate Inbound Port
@@ -160,11 +182,15 @@ pub struct ExecutionContext {
     security_context: SecurityContext,
     observability_context: ObservabilityContext,
     execution_parameters: BTreeMap<String, String>,
+    worker_capability: WorkerCapability,
 }
 
 impl ExecutionContext {
     /// Builds an `ExecutionContext` from plain values — no async runtime,
     /// no transport, and no private adapter module required.
+    // Eight is the doc-mandated Execution Context set (18-worker-model.md:52),
+    // not accidental parameter growth; this value is complete-on-construction.
+    #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
         workload_id: WorkloadId,
@@ -174,6 +200,7 @@ impl ExecutionContext {
         security_context: SecurityContext,
         observability_context: ObservabilityContext,
         execution_parameters: BTreeMap<String, String>,
+        worker_capability: WorkerCapability,
     ) -> Self {
         Self {
             workload_id,
@@ -183,6 +210,7 @@ impl ExecutionContext {
             security_context,
             observability_context,
             execution_parameters,
+            worker_capability,
         }
     }
 
@@ -222,6 +250,14 @@ impl ExecutionContext {
     pub const fn execution_parameters(&self) -> &BTreeMap<String, String> {
         &self.execution_parameters
     }
+
+    /// The carried `WorkerCapability` — additive, read-only access
+    /// (`worker-contract-capability-field/design.md` D6). Names which
+    /// behavior this execution requests the Worker perform.
+    #[must_use]
+    pub const fn worker_capability(&self) -> &WorkerCapability {
+        &self.worker_capability
+    }
 }
 
 #[cfg(test)]
@@ -231,7 +267,10 @@ mod tests {
     use runtime_allocation::AllocationContract;
     use runtime_primitives::{AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId};
 
-    use super::{ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext};
+    use super::{
+        ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext,
+        WorkerCapability,
+    };
 
     fn sample_context(workload_id: WorkloadId) -> ExecutionContext {
         let dependency = ResolvedDependency::new(
@@ -250,6 +289,7 @@ mod tests {
             SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
             ObservabilityContext::new("trace-1", "span-1"),
             execution_parameters,
+            WorkerCapability::new("chat.generate"),
         )
     }
 
@@ -317,6 +357,20 @@ mod tests {
 
         assert_eq!(observability_context.trace_id(), "trace-1");
         assert_eq!(observability_context.span_id(), "span-1");
+    }
+
+    #[test]
+    fn execution_context_worker_capability_accessor_returns_the_carried_value_verbatim() {
+        let context = sample_context(WorkloadId::new());
+
+        assert_eq!(context.worker_capability().name(), "chat.generate");
+    }
+
+    #[test]
+    fn worker_capability_new_and_name_round_trip() {
+        let capability = WorkerCapability::new("chat.generate");
+
+        assert_eq!(capability.name(), "chat.generate");
     }
 
     #[test]

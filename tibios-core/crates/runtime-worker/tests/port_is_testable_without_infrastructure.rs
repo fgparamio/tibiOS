@@ -18,7 +18,7 @@ use runtime_primitives::{AllocationId, ContentHash, ObjectId, ObjectVersion, Wor
 use runtime_worker::{
     CancelAck, ChannelClosed, EndOfStream, ExecutionChannel, ExecutionContext, ExecutionEvent,
     ExecutionPhase, ExecutionPulse, ExecutionReport, ObservabilityContext, Progress,
-    ResolvedDependency, SecurityContext, WorkerError, WorkerService,
+    ResolvedDependency, SecurityContext, WorkerCapability, WorkerError, WorkerService,
 };
 
 /// Drives any `Future` to completion with a no-op waker, under a bounded
@@ -215,6 +215,7 @@ fn sample_context(workload_id: WorkloadId) -> ExecutionContext {
         SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
         ObservabilityContext::new("trace-1", "span-1"),
         execution_parameters,
+        WorkerCapability::new("chat.generate"),
     )
 }
 

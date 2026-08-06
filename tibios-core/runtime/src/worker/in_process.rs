@@ -238,7 +238,7 @@ mod tests {
     use runtime_worker::{
         CancelAck, EndOfStream, ExecutionContext, ExecutionEvent, ExecutionPhase,
         ObservabilityContext, OutputChunk, Progress, ResolvedDependency, SecurityContext,
-        WorkerError, WorkerService,
+        WorkerCapability, WorkerError, WorkerService,
     };
     use tokio::sync::mpsc;
 
@@ -263,6 +263,7 @@ mod tests {
             SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
             ObservabilityContext::new("trace-1", "span-1"),
             execution_parameters,
+            WorkerCapability::new("chat.generate"),
         )
     }
 
