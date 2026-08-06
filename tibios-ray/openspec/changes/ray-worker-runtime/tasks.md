@@ -49,11 +49,11 @@ Chain strategy: stacked-to-main
 - [x] 2.2 `text.py`/`embedding.py`/`rerank.py`/`speech.py`: per-modality execution Protocols — done 2026-08-06
 - [x] 2.3 `tests/unit/backends/` + `assert_type` conformance: no llama.cpp/TensorRT-LLM/vLLM/ONNX/Faster-Whisper imports — done 2026-08-06, 39/39 new tests passing (86/86 total), ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
 
-## Phase 3: selection/ policy (PR 3)
+## Phase 3: selection/ policy (PR 3) — COMPLETE 2026-08-06
 
-- [ ] 3.1 `policy.py`: `ModelSelectionPolicy.plan(model: ResolvedModelRef, constraints) -> ServingPlan`, `ServingConstraints`, `Quantization`
-- [ ] 3.2 pyright fixture: `policy.plan("deepseek")  # type: ignore[arg-type]` + `reportUnnecessaryTypeIgnore = true`
-- [ ] 3.3 `tests/unit/selection/`: decision has only backend+quantization, no discovery step
+- [x] 3.1 `policy.py`: `ModelSelectionPolicy.plan(model: ResolvedModelRef, constraints) -> ServingPlan`, `ServingConstraints`, `Quantization` — done, `ServingPlan.backend: BackendId` satisfies `backends/adapter.py`'s `ServingPlanLike` structurally
+- [x] 3.2 pyright fixture: `policy.plan("deepseek")  # type: ignore[arg-type]` + `reportUnnecessaryTypeIgnoreComment = true` (correct pyright rule name; `reportUnnecessaryTypeIgnore` is not a recognized pyright setting) — done, `tests/unit/selection/pyright_fixtures/rejects_bare_family_string.py`, guard verified to actually fire (see `sdd/ray-worker-runtime/apply-progress`)
+- [x] 3.3 `tests/unit/selection/`: decision has only backend+quantization, no discovery step — done 2026-08-06, 13/13 new tests passing (99/99 total), ruff+pyright clean (see `sdd/ray-worker-runtime/apply-progress`)
 
 ## Phase 4: capabilities/ provider surface (PR 4)
 
