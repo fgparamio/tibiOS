@@ -66,12 +66,12 @@ Wave 4:  S5b            (depends on S4 + S5a)
 
 *(no dependencies; independently mergeable; satisfies `runtime-allocation/spec.md` — "AllocationContract Is A Public Data Contract, Intentionally Partial")*
 
-- [ ] 2.1 In `crates/runtime-allocation/src/lib.rs`, define `pub struct AllocationContract { max_execution_duration: core::time::Duration }` (private field) with a public constructor (`pub fn new(max_execution_duration: core::time::Duration) -> Self`) and a public accessor (`pub fn max_execution_duration(&self) -> core::time::Duration`). Derive `Debug, Clone, Copy, PartialEq, Eq`.
-- [ ] 2.2 Doc comment on `AllocationContract`: cites `02-project-structure.md`'s Ownership Boundaries table (`Allocation -> AllocationContract -> Worker`), states the struct is **intentionally partial** pending `15-allocation-model.md`'s own future change, and names the five deferred facets (exclusive/shared, renewable lease, preemptible, migration allowed, checkpoint required).
-- [ ] 2.3 Confirm the crate doc comment still cites `15-allocation-model.md` (existing requirement, unchanged) and that no public trait is declared alongside `AllocationContract` in this file.
-- [ ] 2.4 Add a `#[cfg(test)] mod tests` block: constructor + accessor round-trip; `Clone`/`Copy`/`PartialEq`/`Eq` semantics hold for two equal and two differing `Duration` values.
-- [ ] 2.5 Self-review: `crates/runtime-allocation/Cargo.toml`'s `[dependencies]` table is unchanged (still empty — `core::time::Duration` needs no crate); `cargo check -p runtime-allocation` succeeds.
-- [ ] 2.6 Confirmation-only: `openspec/specs/runtime-allocation/spec.md`'s "AllocationContract..." requirement (already committed) matches the shipped struct's single field, its doc-commented partiality statement, and the "no behavior beyond trivial constructors/accessors" scenario. No spec edit expected.
+- [x] 2.1 In `crates/runtime-allocation/src/lib.rs`, define `pub struct AllocationContract { max_execution_duration: core::time::Duration }` (private field) with a public constructor (`pub fn new(max_execution_duration: core::time::Duration) -> Self`) and a public accessor (`pub fn max_execution_duration(&self) -> core::time::Duration`). Derive `Debug, Clone, Copy, PartialEq, Eq`.
+- [x] 2.2 Doc comment on `AllocationContract`: cites `02-project-structure.md`'s Ownership Boundaries table (`Allocation -> AllocationContract -> Worker`), states the struct is **intentionally partial** pending `15-allocation-model.md`'s own future change, and names the five deferred facets (exclusive/shared, renewable lease, preemptible, migration allowed, checkpoint required).
+- [x] 2.3 Confirm the crate doc comment still cites `15-allocation-model.md` (existing requirement, unchanged) and that no public trait is declared alongside `AllocationContract` in this file.
+- [x] 2.4 Add a `#[cfg(test)] mod tests` block: constructor + accessor round-trip; `Clone`/`Copy`/`PartialEq`/`Eq` semantics hold for two equal and two differing `Duration` values.
+- [x] 2.5 Self-review: `crates/runtime-allocation/Cargo.toml`'s `[dependencies]` table is unchanged (still empty — `core::time::Duration` needs no crate); `cargo check -p runtime-allocation` succeeds.
+- [x] 2.6 Confirmation-only: `openspec/specs/runtime-allocation/spec.md`'s "AllocationContract..." requirement (already committed) matches the shipped struct's single field, its doc-commented partiality statement, and the "no behavior beyond trivial constructors/accessors" scenario. No spec edit expected.
 
 ---
 
