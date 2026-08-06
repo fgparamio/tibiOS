@@ -111,11 +111,11 @@ both resolution-type guards + pyright fixture, ~359 changed lines).
 - [x] 5.4 `tests/unit/catalog/test_rerank_entries.py`: same pattern for `bge_reranker`/`jina_reranker`
 - [x] 5.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
-## Phase 6: vision (PR 6)
+## Phase 6: vision (PR 6) — COMPLETE
 
-- [ ] 6.1 `catalog/entries/vision.py`: `qwen_vl` (`Qwen/Qwen2.5-VL-7B-Instruct`, `Qwen/Qwen2.5-VL-72B-Instruct`), `llama_vision` (`meta-llama/Llama-3.2-11B-Vision-Instruct`) — this module holds **only** these two families (MC12); `gemma`'s vision answer already exists in `entries/chat.py` (slice 4) and is not duplicated here
-- [ ] 6.2 `tests/unit/catalog/test_vision_entries.py`: RED-first — local `ModelCatalog(VISION_ENTRIES)` fixture, family coverage for `qwen_vl`/`llama_vision`, one full-equality stability assertion per family, derivation round-trip
-- [ ] 6.3 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
+- [x] 6.1 `catalog/entries/vision.py`: `qwen_vl` (`Qwen/Qwen2.5-VL-7B-Instruct`, `Qwen/Qwen2.5-VL-72B-Instruct`), `llama_vision` (`meta-llama/Llama-3.2-11B-Vision-Instruct`) — this module holds **only** these two families (MC12); `gemma`'s vision answer already exists in `entries/chat.py` (slice 4) and is not duplicated here. Note: `design.md`'s worked Reference data table does **not** cover `qwen_vl`/`llama_vision` (only names, line 400) — figures were derived from MC13's formula using the decimal-GB interpretation established in slice 5, not copied verbatim.
+- [x] 6.2 `tests/unit/catalog/test_vision_entries.py`: RED-first — local `ModelCatalog(VISION_ENTRIES)` fixture, family coverage for `qwen_vl`/`llama_vision`, one full-equality stability assertion per family, derivation round-trip
+- [x] 6.3 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
 ## Phase 7: speech + OCR (PR 7)
 
