@@ -107,10 +107,33 @@ async def default_engine_factory(model: str) -> AsyncLLMLike:
 
 
 def default_sampling_params_factory(request: TextRequest) -> Any:
-    """PR 2 (task 2.3) — not implemented yet. Placeholder so the module
-    exposes the name design.md's "Key Contracts" documents; raises if
-    reached before PR 2 lands."""
-    raise NotImplementedError("default_sampling_params_factory lands in PR 2 (task 2.3)")
+    """Constructs the real `vllm.SamplingParams`, importing the SDK
+    lazily (LC11/VL8 inherited) — the ~6-line quarantine VL8's
+    rationale describes: the only place an SDK *type* (not just a
+    factory function) gets constructed, so `generate()` itself never
+    imports `vllm`."""
+
+    try:
+        sampling_params_module = importlib.import_module("vllm.sampling_params")
+    except ModuleNotFoundError as error:
+        raise ModuleNotFoundError(
+            "vllm is required to construct the default vLLM sampling params but "
+            "is not installed. Install it with the optional extra: "
+            "`uv add tibios-ray[vllm]` (or `pip install tibios-ray[vllm]`)."
+        ) from error
+    SamplingParams = sampling_params_module.SamplingParams
+    RequestOutputKind = sampling_params_module.RequestOutputKind
+    return SamplingParams(
+        max_tokens=request.max_tokens,
+        temperature=request.temperature,
+        stop=list(request.stop),
+        n=1,  # TextRequest has no `n` field; generate() only reads outputs[0]
+        # VL9: not a tuning knob — a correctness requirement. Under the
+        # SDK's default CUMULATIVE, every RequestOutput.outputs[0].text
+        # is the *full* text so far, so emitting it as a TextChunk would
+        # make the Provider concatenate the whole completion O(n) times.
+        output_kind=RequestOutputKind.DELTA,  # DELTA, not CUMULATIVE — see VL9
+    )
 
 
 class UnknownSessionError(LookupError):
