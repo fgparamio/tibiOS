@@ -74,10 +74,10 @@ Purely additive: new modules, new tests, one `__init__.py` export edit. No exist
 
 ## Success Criteria
 
-- [ ] Seven Providers across six modules satisfy `CapabilityProvider` (pyright-verified, no base class)
-- [ ] All seven register together in one `CapabilityRegistry` with no duplicate-capability or empty-catalog rejection; `catalog()` returns the union
-- [ ] Every descriptor matches the map above and is asserted stable by test
-- [ ] `execute()` raises `NoBackendAvailableError` for all seven; no Provider ever returns a COMPLETED report
-- [ ] `WorkerRuntime` dispatch to any Provider yields a Failed `ExecutionReport` with a clear failure, never a bare exception
-- [ ] No model name, no `local-infer` reference, and no size/cost routing conditional exists in any Provider
-- [ ] `capabilities/` still imports no `runtime/` symbol; no new backend protocol added
+- [x] Seven Providers across six modules satisfy `CapabilityProvider` (pyright-verified, no base class)
+- [x] All seven register together in one `CapabilityRegistry` with no duplicate-capability or empty-catalog rejection; `catalog()` returns the union
+- [x] Every descriptor matches the map above and is asserted stable by test
+- [x] `execute()` raises `NoBackendAvailableError` for all seven; no Provider ever returns a COMPLETED report
+- [x] `WorkerRuntime` dispatch to any Provider yields a Failed `ExecutionReport` with a clear failure, never a bare exception
+- [x] No model name, no `local-infer` reference, and no size/cost routing conditional exists in any Provider
+- [x] `capabilities/` still imports no `runtime/` symbol; no new backend protocol added

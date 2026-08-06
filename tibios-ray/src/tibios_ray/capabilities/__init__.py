@@ -17,6 +17,7 @@ from tibios_ray.capabilities.descriptor import (
 from tibios_ray.capabilities.embedding import EmbeddingProvider
 from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
+from tibios_ray.capabilities.ocr import OcrProvider
 from tibios_ray.capabilities.provider import CapabilityProvider
 from tibios_ray.capabilities.rerank import RerankProvider
 from tibios_ray.capabilities.speech import SpeechSynthesisProvider, SpeechTranscriptionProvider
@@ -32,6 +33,7 @@ __all__ = [
     "EmbeddingProvider",
     "ModelFamily",
     "NoBackendAvailableError",
+    "OcrProvider",
     "RerankProvider",
     "SpeechSynthesisProvider",
     "SpeechTranscriptionProvider",

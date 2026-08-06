@@ -78,10 +78,10 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 6.4 Update `capabilities/__init__.py` to export both classes
 - [x] 6.5 Verify: `uv run pytest && uv run ruff check && uv run pyright`
 
-## Slice 7 — OCR Provider (PR 7)
+## Slice 7 — OCR Provider (PR 7) — COMPLETE
 
-- [ ] 7.1 RED: `tests/unit/capabilities/test_ocr.py` — descriptor equality with family `paddleocr`; backend `onnxruntime`; flag json only; class name `OcrProvider` (no acronym special-casing)
-- [ ] 7.2 GREEN: create `src/tibios_ray/capabilities/ocr.py` with `OCR_EXTRACT_DESCRIPTOR` and `OcrProvider`
-- [ ] 7.3 Append `OcrProvider()` to `_PROVIDERS` tuple — now all seven Providers present, satisfying proposal's Success Criteria (7 Providers, union catalog, capability-string set)
-- [ ] 7.4 Update `capabilities/__init__.py` to export `OcrProvider`
-- [ ] 7.5 Verify full suite: `uv run pytest && uv run ruff check && uv run pyright`; confirm `test_naming_audit.py` still passes (no "Worker" in any new identifier)
+- [x] 7.1 RED: `tests/unit/capabilities/test_ocr.py` — descriptor equality with family `paddleocr`; backend `onnxruntime`; flag json only; class name `OcrProvider` (no acronym special-casing)
+- [x] 7.2 GREEN: create `src/tibios_ray/capabilities/ocr.py` with `OCR_EXTRACT_DESCRIPTOR` and `OcrProvider`
+- [x] 7.3 Append `OcrProvider()` to `_PROVIDERS` tuple — now all seven Providers present, satisfying proposal's Success Criteria (7 Providers, union catalog, capability-string set)
+- [x] 7.4 Update `capabilities/__init__.py` to export `OcrProvider`
+- [x] 7.5 Verify full suite: `uv run pytest && uv run ruff check && uv run pyright`; confirm `test_naming_audit.py` still passes (no "Worker" in any new identifier)
