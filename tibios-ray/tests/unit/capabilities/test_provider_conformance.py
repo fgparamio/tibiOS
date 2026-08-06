@@ -13,6 +13,7 @@ matching the existing suite (`tests/unit/runtime/test_worker_runtime.py`).
 """
 
 import asyncio
+import dataclasses
 import importlib
 import re
 from collections.abc import Callable
@@ -135,6 +136,25 @@ class TestProviderConformance:
     def test_backend_ids_have_valid_shape(self, provider: CapabilityProvider) -> None:
         for backend in provider.descriptor.backends:
             assert _FLC_SHAPE_PATTERN.fullmatch(backend.value), backend.value
+
+    def test_provider_declares_no_fields(self, provider: CapabilityProvider) -> None:
+        """Providers hold no backend reference (design.md CP1): a
+        zero-field dataclass shape, not just zero *instance* attributes.
+        `slots=True` alone doesn't guard this — it only restricts instance
+        attributes, not declared dataclass fields — so this assertion is
+        the dedicated regression test closing that gap."""
+        # `CapabilityProvider` is a structural Protocol, not itself a
+        # dataclass, so pyright can't statically confirm every conformer
+        # satisfies `DataclassInstance` — true by construction (CP1: every
+        # Provider IS a `@dataclass`), asserted dynamically here instead.
+        declared_fields = dataclasses.fields(type(provider))  # type: ignore[arg-type]
+
+        assert declared_fields == (), (
+            f"{type(provider).__name__} declares field(s) "
+            f"{[f.name for f in declared_fields]!r}, but Providers must hold "
+            "no backend reference (design.md CP1) — remove the field(s) or "
+            "route the backend reference through execute()'s ExecutionContext instead"
+        )
 
     @pytest.mark.parametrize(
         "context_factory", [factory for _, factory in _CONTEXT_VARIANTS], ids=[

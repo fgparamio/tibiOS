@@ -85,3 +85,9 @@ Each PR: `uv run pytest && uv run ruff check && uv run pyright`, run from inside
 - [x] 7.3 Append `OcrProvider()` to `_PROVIDERS` tuple — now all seven Providers present, satisfying proposal's Success Criteria (7 Providers, union catalog, capability-string set)
 - [x] 7.4 Update `capabilities/__init__.py` to export `OcrProvider`
 - [x] 7.5 Verify full suite: `uv run pytest && uv run ruff check && uv run pyright`; confirm `test_naming_audit.py` still passes (no "Worker" in any new identifier)
+
+## Post-verify addendum: permanent zero-declared-fields guard (closes sdd-verify WARNING #1)
+
+All 7 slices above were already 100% complete when `sdd-verify` ran (`sdd/capability-providers/verify-report`, PASS WITH WARNINGS). WARNING #1 noted that "Providers hold no backend reference" was true for all 7 Providers by source inspection only, with no dedicated automated regression test — `slots=True` restricts *instance* attributes, not declared dataclass fields, so nothing stopped a future field from being added silently. This addendum closes that gap without reopening or renumbering Slice 1-7.
+
+- [x] A.1 Added `test_provider_declares_no_fields` to the shared conformance harness (`tests/unit/capabilities/test_provider_conformance.py`), parametrized over all 7 entries in `_PROVIDERS`: asserts `dataclasses.fields(type(provider)) == ()` with a clear failure message naming the offending Provider and its field(s). Mutation-tested live: added `_unused: str = "x"` to `RerankProvider` (`capabilities/rerank.py`), confirmed the new test failed for `RerankProvider` specifically with the expected message, reverted, confirmed 284/284 green again (up from 277 — 7 new parametrized cases, one per Provider). `uv run pytest`, `uv run ruff check`, `uv run pyright` all clean.
