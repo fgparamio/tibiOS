@@ -87,13 +87,13 @@ both resolution-type guards + pyright fixture, ~359 changed lines).
 - [x] 2.16 `catalog/__init__.py`: update re-exports to add `ModelDescriptor`, `BackendSupport`, `ModelCatalog` (still not `entries`)
 - [x] 2.17 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green. Diff exceeded ~400 changed lines as a single PR, so split per the documented fallback: **2a** = `model.py` + `ModelCatalog.__init__`/`families`/`models`/`get` (the `_by_name`/`_by_family` indices) + tasks 2.1-2.3, 2.4 (partial: duplicate+family-mismatch invariants only), 2.5-2.7, and their tests (~393 lines, commits 232af1c/f811453/f9fd2ea); **2b** = `supports`/`quantizations`/`requirements` (the `_footprints` index, including the `AmbiguousFootprintError` invariant) + both resolution-type guards + the pyright fixture (tasks 2.8-2.15) (~359 lines, commits 07649c9/144e844). 378/378 tests passing, ruff clean, pyright clean.
 
-## Phase 3: chat A — qwen, llama, deepseek (PR 3)
+## Phase 3: chat A — qwen, llama, deepseek (PR 3) — COMPLETE
 
-- [ ] 3.1 `catalog/entries/chat.py`: `qwen` family — 5 entries (`Qwen/Qwen3-8B` as the deliberate five-row flagship exercising every `BackendSupport` shape the type permits; `Qwen3-14B`, `Qwen3-32B`, `Qwen3-30B-A3B`, `Qwen2.5-7B-Instruct`) with the exact params/context/serving-row data from `design.md`'s Reference Data table
-- [ ] 3.2 `catalog/entries/chat.py`: `llama` family — 3 entries (`meta-llama/Llama-3.1-8B-Instruct` — the **canonical** form, not `Meta-Llama-3.1-8B-Instruct`; `Llama-3.3-70B-Instruct`; `Llama-3.2-3B-Instruct`)
-- [ ] 3.3 `catalog/entries/chat.py`: `deepseek` family — 2 entries (`DeepSeek-V3`, `DeepSeek-R1`), no `llama_cpp` row (a 671B model is multi-node; claiming single-GPU GGUF support would be catalog fiction). Deliberately excludes `deepseek-ai/DeepSeek-R1-Distill-Qwen-32B` — see task 1.6.
-- [ ] 3.4 `tests/unit/catalog/test_chat_entries.py`: RED-first — local `ModelCatalog(CHAT_ENTRIES)` fixture scoped to this slice's own data (MC14 — shared `entries/__init__.py` assembly is deferred to slice 8); family coverage for `qwen`/`llama`/`deepseek`; one full `ModelDescriptor` equality per family as the stability assertion; derivation round-trip `entry.family == family_of(entry.name)` for every name in this slice
-- [ ] 3.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
+- [x] 3.1 `catalog/entries/chat.py`: `qwen` family — 5 entries (`Qwen/Qwen3-8B` as the deliberate five-row flagship exercising every `BackendSupport` shape the type permits; `Qwen3-14B`, `Qwen3-32B`, `Qwen3-30B-A3B`, `Qwen2.5-7B-Instruct`) with the exact params/context/serving-row data from `design.md`'s Reference Data table
+- [x] 3.2 `catalog/entries/chat.py`: `llama` family — 3 entries (`meta-llama/Llama-3.1-8B-Instruct` — the **canonical** form, not `Meta-Llama-3.1-8B-Instruct`; `Llama-3.3-70B-Instruct`; `Llama-3.2-3B-Instruct`)
+- [x] 3.3 `catalog/entries/chat.py`: `deepseek` family — 2 entries (`DeepSeek-V3`, `DeepSeek-R1`), no `llama_cpp` row (a 671B model is multi-node; claiming single-GPU GGUF support would be catalog fiction). Deliberately excludes `deepseek-ai/DeepSeek-R1-Distill-Qwen-32B` — see task 1.6.
+- [x] 3.4 `tests/unit/catalog/test_chat_entries.py`: RED-first — local `ModelCatalog(CHAT_ENTRIES)` fixture scoped to this slice's own data (MC14 — shared `entries/__init__.py` assembly is deferred to slice 8); family coverage for `qwen`/`llama`/`deepseek`; one full `ModelDescriptor` equality per family as the stability assertion; derivation round-trip `entry.family == family_of(entry.name)` for every name in this slice
+- [x] 3.5 `uv run pytest && uv run ruff check && uv run pyright` — confirm slice green
 
 ## Phase 4: chat B — gemma, mistral, kimi (PR 4)
 
