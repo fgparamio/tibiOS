@@ -49,7 +49,7 @@ Runtime        Runtime
 
 ## Execution Context
 
-Workers never receive raw Workloads — they receive an immutable Execution Context containing every piece of information required to execute: Workload, Allocation, Allocation Contract, Dependency References (already resolved — Workers never locate Objects or perform scheduling-time discovery), Execution Channel, Security Context, Observability Context, Execution Parameters. Workers never request additional execution metadata. Execution Context is immutable after creation.
+Workers never receive raw Workloads — they receive an immutable Execution Context containing every piece of information required to execute: Workload, Allocation, Allocation Contract, Dependency References (already resolved — Workers never locate Objects or perform scheduling-time discovery), Worker Capability, Execution Channel, Security Context, Observability Context, Execution Parameters. Workers never request additional execution metadata. Execution Context is immutable after creation. Worker Capability names the behavior the execution requests (e.g. `chat.generate`) so a Worker fronting several providers can dispatch to the right one; it is not the hardware/platform Capability of `14-resource-model.md`.
 
 ## Allocation Contract
 

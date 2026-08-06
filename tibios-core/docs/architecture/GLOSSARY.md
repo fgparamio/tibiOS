@@ -32,7 +32,7 @@ The glossary never redefines. It only indexes.
 | ObjectId | `02-project-structure.md` | Runtime Primitives | Identity of a Logical Object. |
 | ContentHash | `02-project-structure.md` | Runtime Primitives | Identity of a Content Object. |
 | Resource | `14-resource-model.md` | Resource Model | The Scheduler's language for describing assignable capacity. |
-| Capability | `14-resource-model.md` | Resource Model | A typed hardware/platform trait of a Resource or Worker (GPU, CUDA, VRAM, …). |
+| Capability | `14-resource-model.md` | Resource Model | A typed hardware/platform trait of a Resource or Worker (GPU, CUDA, VRAM, …) — distinct from a Worker Capability (`18-worker-model.md`). |
 | Capacity | `14-resource-model.md` | Resource Model | The observed scalar quantity of a Resource currently available. |
 | Allocation | `15-allocation-model.md` | Allocation Model | A temporary assignment of Resource capacity to a Workload. |
 | Allocation Plan | `15-allocation-model.md` | Allocation Model | The Scheduler's proposed placement, not yet materialized. |
@@ -44,6 +44,7 @@ The glossary never redefines. It only indexes.
 | Cluster Generation | `17-cluster-snapshot.md` | Cluster Snapshot | Observability metadata for topology-level events; never used to validate a Plan. |
 | Worker | `18-worker-model.md` | Worker Model | The domain that executes a Workload; owns nothing but execution. |
 | Execution Context | `18-worker-model.md` | Worker Model | The immutable bundle a Worker receives to execute: Workload, Allocation Contract, resolved dependencies. |
+| Worker Capability | `18-worker-model.md` | Worker Model | The behavior an Execution Context requests the Worker perform (e.g. `chat.generate`) — distinct from a Capability (`14-resource-model.md`). |
 | Execution Channel | `18-worker-model.md` | Worker Model | The Runtime-owned conduit a Worker emits Execution Events through. |
 | Execution Event | `18-worker-model.md` | Worker Model | A fact describing execution as it unfolds. |
 | Execution Report | `18-worker-model.md` | Worker Model | The terminal, authoritative summary of a completed execution. |

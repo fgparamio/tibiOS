@@ -809,6 +809,7 @@ mod tests {
                 span_id: "span-1".to_string(),
             }),
             execution_parameters: std::collections::HashMap::new(),
+            worker_capability: None,
         };
         let result = ExecutionContext::try_from(wire);
         assert_eq!(

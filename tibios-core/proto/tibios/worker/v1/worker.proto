@@ -61,13 +61,26 @@ message ObservabilityContext {
   string span_id = 2;
 }
 
+// WorkerCapability — the behavior one execution requests the Worker
+// perform (e.g. "chat.generate"), so a Worker fronting several providers
+// can dispatch to the right one. Worker-local by design, NOT in
+// primitives/v1/identity.proto: this is Worker-domain vocabulary, not
+// cross-domain identity. Deliberately not named `Capability`: that word
+// is already bound by 14-resource-model.md to a hardware/platform trait
+// (GPU, CUDA, VRAM) that Scheduling filters on — a different concept
+// under the same word (GLOSSARY.md:35, :88).
+// docs/architecture/18-worker-model.md:52 — Execution Context.
+message WorkerCapability {
+  string value = 1;
+}
+
 // ExecutionContext — everything one Worker execution needs, as fields on
 // one message: Workload identity, Allocation identity, the granted
 // AllocationContract, resolved dependency references, the SecurityContext,
-// the ObservabilityContext, and Execution Parameters. There is no Channel
-// field and no CancellationToken field: on the wire, the Channel IS the
-// SubmitJob response stream, and cancellation IS the Cancel RPC — neither
-// serializes (proposal.md Approach #2).
+// the ObservabilityContext, the requested Worker Capability, and Execution
+// Parameters. There is no Channel field and no CancellationToken field: on
+// the wire, the Channel IS the SubmitJob response stream, and cancellation
+// IS the Cancel RPC — neither serializes (proposal.md Approach #2).
 // docs/architecture/18-worker-model.md — Execution Context (full
 // doc-mandated set).
 message ExecutionContext {
@@ -78,6 +91,7 @@ message ExecutionContext {
   SecurityContext security_context = 5;
   ObservabilityContext observability_context = 6;
   map<string, string> execution_parameters = 7;
+  WorkerCapability worker_capability = 8;
 }
 
 // OutputChunk — one ExecutionEvent arm carrying application output data.
