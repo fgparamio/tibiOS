@@ -8,16 +8,19 @@ Reserved to the Contract Entity" requirement:
 
 This scans the Python *identifiers* (class/function/parameter/import/
 assignment names) actually defined or referenced in
-`capabilities/`, `selection/`, `backends/`, and `runtime/` — not raw
-text — so a docstring that quotes the binding rule itself (e.g. "Worker"
-is reserved exclusively for...") never counts as a violation; only real
-code identifiers do.
+`capabilities/`, `selection/`, `backends/`, `runtime/`, and `testing/` —
+not raw text — so a docstring that quotes the binding rule itself (e.g.
+"Worker" is reserved exclusively for...") never counts as a violation;
+only real code identifiers do.
 
 `runtime/` is exempt for exactly one identifier: `WorkerRuntime` — the
 sanctioned single exception (`design.md`, `worker-runtime` spec) because
 it directly drives the Worker Contract lifecycle. Nothing else in
-`runtime/`, and nothing at all in `capabilities/`, `selection/`, or
-`backends/`, may contain "Worker" as an identifier.
+`runtime/`, and nothing at all in `capabilities/`, `selection/`,
+`backends/`, or `testing/` (Phase 6's shared fakes — `StubProvider`
+implements `CapabilityProvider`, `RecordingBackend` implements
+`BackendAdapter`, neither is a "Worker"), may contain "Worker" as an
+identifier.
 """
 
 import ast
@@ -32,6 +35,7 @@ _AUDITED_PACKAGES: tuple[tuple[str, frozenset[str]], ...] = (
     ("selection", frozenset()),
     ("backends", frozenset()),
     ("runtime", frozenset({"WorkerRuntime"})),
+    ("testing", frozenset()),
 )
 
 
