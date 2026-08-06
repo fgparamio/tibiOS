@@ -5,6 +5,9 @@
 .idea/
 .codegraph/
 
+# Claude Code local worktrees (tool-managed, machine-local, never source of truth)
+.claude/worktrees/
+
 # Rust (tibios-core)
 /tibios-core/target/
 target/
