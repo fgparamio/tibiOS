@@ -79,8 +79,8 @@ Chain strategy: stacked-to-main
 - [x] 6.1 `InMemoryExecutionChannel`, `FakeExecutionContext`, `ManualCancellation`, `StubProvider`, `RecordingBackend` — done, RED-first (`tests/unit/testing/`: 22 new tests, all failed with `ModuleNotFoundError` before `src/tibios_ray/testing/` existed), then GREEN (174/174 total), ruff+pyright clean. Naming audit (Phase 5) extended to also scan `testing/` (zero exemptions), mutation-verified.
 - [x] 6.2 Retrofit Phase 1-5 ad-hoc test doubles to import from `testing/` (dedupe) — done, 6 files retrofitted one at a time (`tests/unit/execution/test_channel.py`, `tests/unit/execution/test_context.py`, `tests/unit/capabilities/test_provider.py`, `tests/unit/runtime/test_registry.py`, `tests/unit/runtime/test_worker_runtime.py`, `tests/unit/backends/test_adapter.py`), full suite re-run green after each swap, no assertions changed (174/174 total throughout), ruff+pyright clean.
 
-## Phase 7: wiring + docs (PR 7)
+## Phase 7: wiring + docs (PR 7) — COMPLETE 2026-08-06
 
-- [ ] 7.1 `worker.py` docstring: composition root builds registry, owns one `WorkerRuntime`
-- [ ] 7.2 `docs/architecture/01-worker-runtime.md`: cites `18-worker-model.md`, no duplication
-- [ ] 7.3 Repo-wide grep: zero `local-infer` routing rule, zero stray "Worker" identifiers — confirms proposal Success Criteria
+- [x] 7.1 `worker.py` docstring: composition root builds registry, owns one `WorkerRuntime` — done, updated to reference the now-real `CapabilityRegistry`/`WorkerRuntime` types (Phases 4-5), still zero business logic, notes gRPC wiring is blocked on the not-yet-existing `.proto` contract (sibling `proto-worker-contract` change in progress in `tibios-core`)
+- [x] 7.2 `docs/architecture/01-worker-runtime.md`: cites `18-worker-model.md`, no duplication — done, summary-level flow/terminology/module-layout doc pointing to `design.md` and `openspec/changes/ray-worker-runtime/` for detail
+- [x] 7.3 Repo-wide grep: zero `local-infer` routing rule, zero stray "Worker" identifiers — confirms proposal Success Criteria — done, manual `rg` sweep of `src/`, `tests/`, `docs/`, `README.md`, `pyproject.toml`: zero `local-infer`/size-routing patterns anywhere; every "Worker" occurrence outside `WorkerRuntime` is a docstring/prose citation of the Worker Contract concept, none are code identifiers (Phase 5's AST-based `test_naming_audit.py` already enforces this for `capabilities/selection/backends/runtime/testing/` at the unit level)
