@@ -18,7 +18,7 @@ assembly is deferred to the final slice).
 Unlike the Chat family group (slices 3-4), `design.md`'s worked
 Reference data table does not cover `qwen_vl`/`llama_vision` — only the
 family/model-name list (line 400, "Remaining groups"). Every
-`min_vram_bytes` figure here is therefore *derived*, not copied, from
+`min_vram_gb` figure here is therefore *derived*, not copied, from
 MC13's formula (`ceil_gib(parameter_count x bits/8 x 1.2)`), using the
 decimal-GB (`bytes / 1e9`, ceiling) interpretation established in slice
 5's `entries/embedding.py`/`entries/rerank.py` (reverse-engineered from
@@ -66,10 +66,10 @@ QWEN_VL_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=5
                 ),
             }
         ),
@@ -83,13 +83,13 @@ QWEN_VL_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=177
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=177
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=45
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=45
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=177
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_gb=177
                 ),
             }
         ),
@@ -108,10 +108,10 @@ LLAMA_VISION_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=26
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=26
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=7
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=7
                 ),
             }
         ),

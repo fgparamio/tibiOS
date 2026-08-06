@@ -61,7 +61,7 @@ class ModelCatalog:
                         raise AmbiguousFootprintError(
                             entry.name, backend=row.backend, quantization=quantization
                         )
-                    footprints[key] = row.min_vram_bytes
+                    footprints[key] = row.min_vram_gb
 
             by_name[entry.name] = entry
             by_family.setdefault(entry.family, []).append(entry)

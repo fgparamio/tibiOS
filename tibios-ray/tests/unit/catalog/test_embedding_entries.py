@@ -115,10 +115,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                     ),
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                     ),
                 }
             ),
@@ -131,7 +131,7 @@ class TestStabilityAssertions:
         # fp32 both round to 1 GiB at this parameter count, so they
         # share one BackendSupport row (design decision MC5's pattern:
         # `quantizations` on a row holds every scheme sharing one
-        # `min_vram_bytes`).
+        # `min_vram_gb`).
         expected = ModelDescriptor(
             name=PublishedModelName("nomic-ai/nomic-embed-text-v1.5"),
             family=ModelFamily("nomic_embed"),
@@ -142,7 +142,7 @@ class TestStabilityAssertions:
                     BackendSupport(
                         backend=_ONNXRUNTIME,
                         quantizations=frozenset({_INT8, _FP32}),
-                        min_vram_bytes=1,
+                        min_vram_gb=1,
                     ),
                 }
             ),
@@ -160,10 +160,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                     ),
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                     ),
                 }
             ),
@@ -181,10 +181,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                     ),
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                     ),
                 }
             ),

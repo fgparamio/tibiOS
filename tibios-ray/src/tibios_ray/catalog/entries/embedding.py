@@ -11,7 +11,7 @@ family group (MC14 — `entries/__init__.py`'s `ALL_ENTRIES`/
 
 Unlike the Chat family group (slices 3-4), `design.md` has no worked
 Reference data table for `bge`/`nomic_embed`/`e5`/`jina_embeddings` —
-only the family/model-name list (line 400). Every `min_vram_bytes`
+only the family/model-name list (line 400). Every `min_vram_gb`
 figure here is therefore *derived*, not copied, from MC13's formula
 (`ceil_gib(parameter_count x bits/8 x 1.2)`), using each model's
 publicly published parameter count. `context_window` is the natively
@@ -25,7 +25,7 @@ advertise none"). Two quantization tiers are used throughout: `int8`
 embedding exports commonly ship. Where both tiers round to the same
 whole-GiB figure at a given parameter count, they share one
 `BackendSupport` row (design decision MC5's pattern: `quantizations` on
-a row holds every scheme sharing one `min_vram_bytes`).
+a row holds every scheme sharing one `min_vram_gb`).
 """
 
 from tibios_ray.backends.adapter import BackendId
@@ -55,10 +55,10 @@ BGE_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                 ),
             }
         ),
@@ -72,10 +72,10 @@ BGE_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=2
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=2
                 ),
             }
         ),
@@ -96,7 +96,7 @@ NOMIC_EMBED_ENTRIES: tuple[ModelDescriptor, ...] = (
                 BackendSupport(
                     backend=_ONNXRUNTIME,
                     quantizations=frozenset({_INT8, _FP32}),
-                    min_vram_bytes=1,
+                    min_vram_gb=1,
                 ),
             }
         ),
@@ -113,10 +113,10 @@ E5_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                 ),
             }
         ),
@@ -130,10 +130,10 @@ E5_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=2
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=2
                 ),
             }
         ),
@@ -151,10 +151,10 @@ JINA_EMBEDDINGS_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                 ),
             }
         ),

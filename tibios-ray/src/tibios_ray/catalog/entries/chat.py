@@ -12,7 +12,7 @@ assembly is deferred to the final slice). Slice 3 added `qwen`, `llama`,
 `deepseek`; this slice (4) appends `gemma`, `mistral`, `kimi` to the
 same tuple — all six families now live here.
 
-Every `min_vram_bytes` figure is stated data derived from MC13's formula
+Every `min_vram_gb` figure is stated data derived from MC13's formula
 (`ceil_gib(parameter_count x bits/8 x 1.2)`), copied verbatim from
 `design.md`'s worked Reference data table — not recomputed here.
 `context_window` is the natively published window, not an extended one
@@ -55,19 +55,19 @@ QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_bytes=10
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_gb=10
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                 ),
             }
         ),
@@ -80,13 +80,13 @@ QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=9
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=9
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=36
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=36
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=9
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=9
                 ),
             }
         ),
@@ -99,13 +99,13 @@ QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=79
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=79
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=20
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=20
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=79
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_gb=79
                 ),
             }
         ),
@@ -118,10 +118,10 @@ QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=74
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=74
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=19
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=19
                 ),
             }
         ),
@@ -134,10 +134,10 @@ QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=19
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=19
                 ),
             }
         ),
@@ -156,13 +156,13 @@ LLAMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=5
                 ),
             }
         ),
@@ -175,13 +175,13 @@ LLAMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=170
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=170
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=43
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=43
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=170
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_gb=170
                 ),
             }
         ),
@@ -194,10 +194,10 @@ LLAMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=2
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=2
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=8
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=8
                 ),
             }
         ),
@@ -215,13 +215,13 @@ DEEPSEEK_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=805
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=403
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=403
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_bytes=805
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=805
                 ),
             }
         ),
@@ -237,10 +237,10 @@ DEEPSEEK_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=805
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_bytes=805
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=805
                 ),
             }
         ),
@@ -262,10 +262,10 @@ GEMMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=3
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=3
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=11
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=11
                 ),
             }
         ),
@@ -278,13 +278,13 @@ GEMMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=8
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=8
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=30
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=30
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=8
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=8
                 ),
             }
         ),
@@ -297,13 +297,13 @@ GEMMA_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=66
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=66
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=17
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=17
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=66
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_gb=66
                 ),
             }
         ),
@@ -319,10 +319,10 @@ MISTRAL_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=18
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=18
                 ),
             }
         ),
@@ -335,10 +335,10 @@ MISTRAL_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=58
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=58
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=15
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=15
                 ),
             }
         ),
@@ -358,13 +358,13 @@ KIMI_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=1200
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=1200
                 ),
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=600
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=600
                 ),
                 BackendSupport(
-                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_bytes=1200
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_gb=1200
                 ),
             }
         ),

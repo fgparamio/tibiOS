@@ -56,12 +56,12 @@ def _qwen_entry() -> ModelDescriptor:
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                 ),
                 BackendSupport(
-                    backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_bytes=10
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_gb=10
                 ),
-                BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20),
+                BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20),
             }
         ),
     )
@@ -78,7 +78,7 @@ def _llama_entry() -> ModelDescriptor:
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=5
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_gb=5
                 )
             }
         ),
@@ -92,7 +92,7 @@ def _deepseek_entry() -> ModelDescriptor:
         parameter_count=671_000_000_000,
         context_window=163_840,
         serving=frozenset(
-            {BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=805)}
+            {BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=805)}
         ),
     )
 
@@ -127,7 +127,7 @@ class TestModels:
             parameter_count=14_800_000_000,
             context_window=32_768,
             serving=frozenset(
-                {BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=36)}
+                {BackendSupport(backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=36)}
             ),
         )
         catalog = ModelCatalog([_qwen_entry(), alpha])
@@ -187,10 +187,10 @@ class TestConstructionInvariants:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                     ),
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=21
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=21
                     ),
                 }
             ),
@@ -247,7 +247,7 @@ class TestQuantizations:
 
 
 class TestRequirements:
-    def test_returns_min_vram_bytes_for_the_exact_triple(self) -> None:
+    def test_returns_min_vram_gb_for_the_exact_triple(self) -> None:
         catalog = _catalog()
         assert catalog.requirements(_QWEN_NAME, _LLAMA_CPP, _Q4_K_M) == 5
         assert catalog.requirements(_QWEN_NAME, _LLAMA_CPP, _Q8_0) == 10

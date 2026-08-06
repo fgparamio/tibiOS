@@ -125,23 +125,23 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                     ),
                     BackendSupport(
-                        backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_bytes=10
+                        backend=_LLAMA_CPP, quantizations=frozenset({_Q8_0}), min_vram_gb=10
                     ),
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                     ),
                     BackendSupport(
                         backend=_VLLM,
                         quantizations=frozenset({_AWQ, _GPTQ}),
-                        min_vram_bytes=5,
+                        min_vram_gb=5,
                     ),
                     BackendSupport(
                         backend=_TENSORRT_LLM,
                         quantizations=frozenset({_FP16}),
-                        min_vram_bytes=20,
+                        min_vram_gb=20,
                     ),
                 }
             ),
@@ -158,15 +158,15 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                     ),
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=20
                     ),
                     BackendSupport(
                         backend=_VLLM,
                         quantizations=frozenset({_AWQ, _GPTQ}),
-                        min_vram_bytes=5,
+                        min_vram_gb=5,
                     ),
                 }
             ),
@@ -183,17 +183,17 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=805
+                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=805
                     ),
                     BackendSupport(
                         backend=_VLLM,
                         quantizations=frozenset({_AWQ, _GPTQ}),
-                        min_vram_bytes=403,
+                        min_vram_gb=403,
                     ),
                     BackendSupport(
                         backend=_TENSORRT_LLM,
                         quantizations=frozenset({_FP8}),
-                        min_vram_bytes=805,
+                        min_vram_gb=805,
                     ),
                 }
             ),
@@ -216,15 +216,15 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=8
+                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=8
                     ),
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=30
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=30
                     ),
                     BackendSupport(
                         backend=_VLLM,
                         quantizations=frozenset({_AWQ, _GPTQ}),
-                        min_vram_bytes=8,
+                        min_vram_gb=8,
                     ),
                 }
             ),
@@ -241,10 +241,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                        backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_gb=5
                     ),
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=18
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_gb=18
                     ),
                 }
             ),
@@ -261,17 +261,17 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=1200
+                        backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_gb=1200
                     ),
                     BackendSupport(
                         backend=_VLLM,
                         quantizations=frozenset({_AWQ, _GPTQ}),
-                        min_vram_bytes=600,
+                        min_vram_gb=600,
                     ),
                     BackendSupport(
                         backend=_TENSORRT_LLM,
                         quantizations=frozenset({_FP8}),
-                        min_vram_bytes=1200,
+                        min_vram_gb=1200,
                     ),
                 }
             ),

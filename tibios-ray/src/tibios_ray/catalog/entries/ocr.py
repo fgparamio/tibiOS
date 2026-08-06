@@ -8,7 +8,7 @@ assembly is deferred to the final slice).
 
 Unlike the Chat family group (slices 3-4), `design.md`'s worked
 Reference data table does not cover `paddleocr` — only the
-family/model-name list (line 400, "Remaining groups"). `min_vram_bytes`
+family/model-name list (line 400, "Remaining groups"). `min_vram_gb`
 is therefore *derived*, not copied, from MC13's formula
 (`ceil_gib(parameter_count x bits/8 x 1.2)`), using the decimal-GB
 (`bytes / 1e9`, ceiling) interpretation established in slice 5.
@@ -56,7 +56,7 @@ PADDLEOCR_ENTRIES: tuple[ModelDescriptor, ...] = (
                 BackendSupport(
                     backend=_ONNXRUNTIME,
                     quantizations=frozenset({_INT8, _FP32}),
-                    min_vram_bytes=1,
+                    min_vram_gb=1,
                 ),
             }
         ),

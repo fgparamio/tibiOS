@@ -127,7 +127,7 @@ class TestCatalogToDescriptor:
 
     @pytest.mark.parametrize("entry", ALL_ENTRIES, ids=[entry.name.value for entry in ALL_ENTRIES])
     def test_entry_every_serving_row_has_positive_min_vram(self, entry: ModelDescriptor) -> None:
-        assert all(row.min_vram_bytes > 0 for row in entry.serving)
+        assert all(row.min_vram_gb > 0 for row in entry.serving)
 
 
 class TestAllEntriesAssembly:

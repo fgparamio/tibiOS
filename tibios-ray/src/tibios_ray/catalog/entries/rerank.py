@@ -9,7 +9,7 @@ slice).
 
 Same situation as `entries/embedding.py`: `design.md` has no worked
 Reference data table for `bge_reranker`/`jina_reranker` — only the
-family/model-name list (line 400). Every `min_vram_bytes` figure here is
+family/model-name list (line 400). Every `min_vram_gb` figure here is
 *derived*, not copied, from MC13's formula
 (`ceil_gib(parameter_count x bits/8 x 1.2)`), using each model's
 publicly published parameter count. `context_window` is the natively
@@ -47,10 +47,10 @@ BGE_RERANKER_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                 ),
             }
         ),
@@ -67,10 +67,10 @@ JINA_RERANKER_ENTRIES: tuple[ModelDescriptor, ...] = (
         serving=frozenset(
             {
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                 ),
                 BackendSupport(
-                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=2
+                    backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=2
                 ),
             }
         ),

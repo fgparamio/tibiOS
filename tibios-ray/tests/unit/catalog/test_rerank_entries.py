@@ -96,10 +96,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                     ),
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=3
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=3
                     ),
                 }
             ),
@@ -119,10 +119,10 @@ class TestStabilityAssertions:
             serving=frozenset(
                 {
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_bytes=1
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_INT8}), min_vram_gb=1
                     ),
                     BackendSupport(
-                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_bytes=2
+                        backend=_ONNXRUNTIME, quantizations=frozenset({_FP32}), min_vram_gb=2
                     ),
                 }
             ),

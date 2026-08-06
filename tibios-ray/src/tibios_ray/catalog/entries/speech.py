@@ -13,7 +13,7 @@ assembly is deferred to the final slice).
 Unlike the Chat family group (slices 3-4), `design.md`'s worked
 Reference data table does not cover `whisper`/`kokoro` — only the
 family/model-name list (line 400, "Remaining groups"). Every
-`min_vram_bytes` figure here is therefore *derived*, not copied, from
+`min_vram_gb` figure here is therefore *derived*, not copied, from
 MC13's formula (`ceil_gib(parameter_count x bits/8 x 1.2)`), using the
 decimal-GB (`bytes / 1e9`, ceiling) interpretation established in slice
 5's `entries/embedding.py`/`entries/rerank.py` and reused in slice 6's
@@ -65,12 +65,12 @@ WHISPER_ENTRIES: tuple[ModelDescriptor, ...] = (
                 BackendSupport(
                     backend=_FASTER_WHISPER,
                     quantizations=frozenset({_FP16}),
-                    min_vram_bytes=4,
+                    min_vram_gb=4,
                 ),
                 BackendSupport(
                     backend=_FASTER_WHISPER,
                     quantizations=frozenset({_INT8}),
-                    min_vram_bytes=2,
+                    min_vram_gb=2,
                 ),
             }
         ),
@@ -87,12 +87,12 @@ WHISPER_ENTRIES: tuple[ModelDescriptor, ...] = (
                 BackendSupport(
                     backend=_FASTER_WHISPER,
                     quantizations=frozenset({_FP16}),
-                    min_vram_bytes=2,
+                    min_vram_gb=2,
                 ),
                 BackendSupport(
                     backend=_FASTER_WHISPER,
                     quantizations=frozenset({_INT8}),
-                    min_vram_bytes=1,
+                    min_vram_gb=1,
                 ),
             }
         ),
@@ -114,7 +114,7 @@ KOKORO_ENTRIES: tuple[ModelDescriptor, ...] = (
                 BackendSupport(
                     backend=_ONNXRUNTIME,
                     quantizations=frozenset({_INT8, _FP32}),
-                    min_vram_bytes=1,
+                    min_vram_gb=1,
                 ),
             }
         ),

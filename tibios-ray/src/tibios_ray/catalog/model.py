@@ -2,12 +2,12 @@
 
 `BackendSupport` is keyed by (backend, footprint tier), not by backend
 alone (design decision MC5) — the proposal stated both "footprint is a
-function of quantization" and a single scalar `min_vram_bytes` per
+function of quantization" and a single scalar `min_vram_gb` per
 backend, a latent contradiction. A `ModelDescriptor` may therefore carry
 several `BackendSupport` rows for the same `BackendId`, one per tier
 (e.g. one row for `q4_k_m`, another for `q8_0` on `llama_cpp`).
 `quantizations` on a row holds the schemes that share one
-`min_vram_bytes` — `awq` and `gptq` at 4 bits do, `fp16` does not.
+`min_vram_gb` — `awq` and `gptq` at 4 bits do, `fp16` does not.
 
 `Quantization` is reused from `selection/policy.py`, not mirrored — the
 transitive module edge `catalog -> selection -> execution` that follows
@@ -27,13 +27,13 @@ from tibios_ray.selection.policy import Quantization
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BackendSupport:
     """One (backend, footprint tier) row of a model's serving table
-    (design decision MC5). `min_vram_bytes` is advisory, derived as
+    (design decision MC5). `min_vram_gb` is advisory, derived as
     `parameter_count * bits / 8 * 1.2` rounded up to a whole GiB (MC13);
     nothing in this change makes an admission decision from it."""
 
     backend: BackendId
     quantizations: frozenset[Quantization]
-    min_vram_bytes: int
+    min_vram_gb: int
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
