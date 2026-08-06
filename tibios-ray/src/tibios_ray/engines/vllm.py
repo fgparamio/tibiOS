@@ -18,10 +18,11 @@ every session of the same model, refcounted by a private Model Runtime
 (design decisions VL2-VL6). The lock guards residency transitions only
 — never `generate()` itself (VL5, the exact inversion of LC4).
 
-PR 1 (this file's current state) builds the Model Runtime and residency
-seam: `backend_id`, `supports`, `acquire`, `release`. PR 2 adds the
-real `generate()` streaming implementation, uniform cancellation, and
-the sampling-params factory (VL9-VL14) — not built yet.
+PR 1 built the Model Runtime and residency seam: `backend_id`,
+`supports`, `acquire`, `release`. PR 2 (this file's current state)
+completes the Backend: native-async `generate()` streaming, uniform
+cancellation (`_finalize`/`_schedule_finalize`, VL9-VL14), and the
+default sampling-params factory.
 
 Accepted, explicit limitations (design.md):
 - Model resolution is out of band (inherited debt, unchanged): the
@@ -37,6 +38,11 @@ Accepted, explicit limitations (design.md):
   continuous batching, and the trade being bought deliberately.
 - Quantization never reaches the engine: `ServingPlanLike` does not
   expose it, so it travels with the out-of-band configuration.
+- The stub (`StubAsyncLLM`) cannot prove the real SDK signature: unit
+  tests exercise this module's own contract with `vllm` fully
+  substituted, never the real `AsyncLLM`/`SamplingParams` classes.
+  `tests/integration/test_vllm_smoke.py` is the opt-in, real-SDK check
+  for that gap (skipped unless `TIBIOS_RAY_VLLM_MODEL` is set).
 """
 
 import asyncio
@@ -182,7 +188,7 @@ class VllmTextBackend:
     Unlike `LlamaCppTextBackend`'s one-engine-per-session shape, this
     Backend owns a single, lazily-constructed, refcounted Model Runtime
     (design decisions VL2-VL6) shared across every acquired session of
-    `model`. `generate()` is not implemented until PR 2."""
+    `model`."""
 
     def __init__(
         self,
