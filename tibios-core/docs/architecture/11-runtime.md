@@ -17,7 +17,7 @@ This document is the map. It shows how every domain fits together and why the pi
 The Runtime owns:
 
 - The Composition Root — wiring every domain's Inbound and Outbound Ports together (`02-project-structure.md`).
-- The end-to-end lifecycle of a Workload, from submission to Historical Fact.
+- The end-to-end lifecycle of a Workload, from submission to Historical Fact: `WorkloadState` moves `Created → Scheduled → Running → Completed/Failed → Recovered`, the Runtime-wide state referenced by `18-worker-model.md`'s Worker-local lifecycle (a separate, finer-grained state machine — the two are never merged).
 - Nothing beyond coordination. No scheduling, admission, allocation, or execution logic lives in the Runtime itself — it lives in the domain that owns that question.
 
 The Runtime delegates:
