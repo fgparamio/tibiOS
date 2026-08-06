@@ -4,7 +4,7 @@
 
 `worker-wire-adapter` is the fallible conversion boundary living inside `runtime-worker`'s private `adapters::grpc::convert` module, between the generated `tonic`/`prost` wire types and their `runtime-primitives` domain counterparts. It does not redefine the wire shape — `worker-wire-contract` remains normative for that — this spec constrains only what the boundary conversion MUST do when handed data that does not conform to that shape.
 
-This spec is scoped exactly to the boundary that exists today: the five identity-wrapper messages in `identity.proto` (`ObjectId`, `ObjectVersion`, `ContentHash`, `WorkloadId`, `AllocationId`) and their round-trip to `runtime-primitives`, plus exhaustive decoding of the two `oneof`s: `ExecutionEvent`'s six arms (`OutputChunk`, `Progress`, `Warning`, `CheckpointCreated`, `MetricsSnapshot`, `EndOfStream`) and `ExecutionResponse`'s two arms (`event`, `report`). Worker domain types (`ExecutionContext`, `ExecutionReport`, and the rest of `18-worker-model.md`'s domain model) are explicitly out of scope — they do not exist yet and are not converted by this boundary.
+This spec is scoped exactly to the boundary that exists today: the five identity-wrapper messages in `identity.proto` (`ObjectId`, `ObjectVersion`, `ContentHash`, `WorkloadId`, `AllocationId`) and their round-trip to `runtime-primitives`, plus exhaustive decoding of the two `oneof`s: `ExecutionEvent`'s six arms (`OutputChunk`, `Progress`, `Warning`, `CheckpointCreated`, `MetricsSnapshot`, `EndOfStream`) and `ExecutionResponse`'s two arms (`event`, `report`). Worker domain types (`ExecutionContext`, `ExecutionReport`, and the rest of `18-worker-model.md`'s domain model) now exist, defined by `worker-inbound-port` and the `runtime-worker` spec delta; every conversion this boundary performs targets those real domain types, never a private local mirror.
 
 ## Requirements
 
@@ -93,3 +93,25 @@ Every `Err` produced by a conversion in this boundary — an invalid ULID string
 - GIVEN any malformed wire input covered by this spec
 - WHEN the corresponding `TryFrom` is exercised
 - THEN it returns `Err` and neither panics nor aborts the process
+
+### Requirement: Conversions Target Real Domain Types, No Local Mirror Remains
+
+Now that Worker domain types exist (`worker-inbound-port`), every `TryFrom` impl in this boundary MUST convert into the real `runtime-worker` domain type, not into a private local mirror type defined for lack of a real target. `convert.rs` MUST NOT define a local mirror enum or struct standing in for a domain type that now exists (e.g. no local counterpart to `ExecutionEvent` or `ExecutionResponse`'s payload), and MUST NOT define a private copy of `Classify` — it MUST implement the public `runtime_primitives::Classify` on `ConversionError` instead.
+
+#### Scenario: No local mirror type stands in for a domain type
+
+- GIVEN `crates/runtime-worker/src/adapters/grpc/convert.rs`
+- WHEN its type definitions are inspected
+- THEN it defines no local enum or struct that duplicates the shape of a domain type now defined by `runtime-worker` (`ExecutionEvent`, `ExecutionResponse`'s payload, or any other)
+
+#### Scenario: No private Classify copy remains
+
+- GIVEN `crates/runtime-worker/src/adapters/grpc/convert.rs`
+- WHEN it is searched for a `trait Classify` declaration
+- THEN none is found, and `ConversionError` implements `runtime_primitives::Classify` instead
+
+#### Scenario: Every prior rejection scenario still passes against the real domain types
+
+- GIVEN every rejection scenario this spec already defines (invalid identity text, unset required field, unset `ExecutionEvent` oneof, unset `ExecutionResponse` oneof)
+- WHEN it is re-run after `convert.rs` is retargeted to the real domain types
+- THEN it passes unchanged, producing a value of the real domain type on success and the same classified rejection on failure

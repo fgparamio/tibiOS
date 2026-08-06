@@ -78,15 +78,34 @@ Every ULID-backed newtype produced by the `ulid_newtype!` macro (`ObjectId`, `No
 - WHEN it is passed to `ObjectVersion`'s fallible constructor
 - THEN construction fails with an error, never panics, and never silently substitutes `ObjectVersion::initial()` or any other stand-in value
 
-### Requirement: No Public Traits In This Change
+### Requirement: Classify Trait Is Public
 
-`runtime-primitives` MUST NOT define public trait definitions (Inbound Ports) as part of this change; trait/port design is an explicit follow-up change.
+`runtime-primitives` MUST define a public `Classify` trait, in its `error` module (or an equivalent public path), with exactly one method: `classify(&self) -> ErrorClass`. This is the explicit follow-up change named by the prior "No Public Traits In This Change" requirement it replaces, and it fulfills `04-error-handling.md:146` ("`ErrorClass` and the `Classify` trait live in `runtime-primitives`"). `Classify` MUST be implemented by `runtime-worker`'s `WorkerError` and by the adapter's `ConversionError` (`worker-wire-adapter`); no crate MUST define a private copy of this trait once this requirement is satisfied.
 
-#### Scenario: No trait declarations beyond derives
+#### Scenario: Classify is public with the documented shape
 
-- GIVEN `runtime-primitives/src/lib.rs`
-- WHEN inspected
-- THEN it contains no hand-written `trait` declarations
+- GIVEN `runtime-primitives`'s public API
+- WHEN `Classify` is looked up
+- THEN it is a public trait with exactly one method, `classify(&self) -> ErrorClass`
+
+#### Scenario: WorkerError implements Classify
+
+- GIVEN `runtime-worker`'s `WorkerError` type
+- WHEN its trait implementations are inspected
+- THEN `runtime_primitives::Classify` is implemented for it
+
+#### Scenario: ConversionError implements the public Classify, not a private copy
+
+- GIVEN `worker-wire-adapter`'s `ConversionError` type
+- WHEN its trait implementations are inspected
+- THEN `runtime_primitives::Classify` is implemented for it
+- AND no private `Classify` trait definition remains anywhere in `runtime-worker`
+
+#### Scenario: An unset wire ExecutionPhase classifies Permanent
+
+- GIVEN a wire `EXECUTION_PHASE_UNSPECIFIED` value reaching a conversion boundary
+- WHEN the resulting rejection error's `Classify::classify()` is called
+- THEN it returns `ErrorClass::Permanent`
 
 ### Requirement: Ownership Documented
 
