@@ -8,6 +8,8 @@ The Scheduling Engine decides where a Workload should execute. It never decides 
 
 This document follows the principles in `00-philosophy.md` and `02-project-structure.md`. It does not redefine Ownership, Object identity, or the Ports & Adapters model.
 
+Diagram: `diagrams/scheduling.md`.
+
 ## The Scheduler Coordinates. Policies Decide.
 
 The Scheduling Engine never makes placement decisions directly. Decisions belong to small, independent Policies, each answering exactly one question: Capacity, Locality, Latency, Cost, Energy, NUMA, GPU/Capability, Maintenance-window awareness. New policies (Carbon Footprint, Rack Temperature, LLM Affinity) are added without touching the Scheduling Engine itself.

@@ -8,6 +8,8 @@ The Runtime is what turns a collection of independent Tibi Box nodes into a sing
 
 The Runtime is not a scheduler, not a storage engine, not a network stack, and not an execution engine. It is the composition of all of them — each owned by a dedicated domain, wired together at the Composition Root (`02-project-structure.md`). The Runtime itself makes no eligibility decisions, no placement decisions, no allocation decisions, and executes no Workload directly. It owns none of the domain logic described in `13-object-model.md`–`22-networking.md`; it owns the fact that those domains cooperate correctly.
 
+Diagrams: `diagrams/runtime-overview.md`, `diagrams/runtime-pipeline.md`.
+
 This document is the map. It shows how every domain fits together and why the pipeline has the shape it has. It does not redefine Ownership, Identity, or the Authoritative/Observational distinction — those belong to `00-philosophy.md`. Each domain's internal detail belongs to its own document (`13-object-model.md`–`22-networking.md`).
 
 ## Runtime Responsibilities

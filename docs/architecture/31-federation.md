@@ -6,6 +6,8 @@ Version: 1.0
 
 Federation answers a question no other document has answered: **how do two independent TibiOS Runtimes cooperate?** It is not Membership (`22-networking.md`, which governs Nodes joining a single cluster), not Replication (`24-replication.md`, which moves content once cooperation is already authorized), and not a merger — federating two Runtimes never produces one Runtime; both retain independent identity, independent Trust, and independent Storage.
 
+Diagram: `diagrams/federation.md`.
+
 Federation closes a reference `13-object-model.md` left open since it was written: *"replication across islands requires explicit authorization... see trust boundaries in `22-networking.md`"* — a concept `22-networking.md` never fully defined, because it lacked the identity to define it with. This document supplies that identity and completes the definition.
 
 ## Ownership

@@ -6,6 +6,8 @@ Version: 1.0
 
 Replication ensures that immutable Content Objects (`13-object-model.md`) remain available across the Runtime by maintaining Physical Replicas. It is not the Object Store (`23-object-store.md`) — it does not resolve references or identity. It is not the Storage Engine (`21-runtime-storage-engine.md`) — it does not own durability of authoritative facts. Replication owns exactly one question: **does an accessible copy of this Content Object exist?**
 
+Diagram: `diagrams/replication.md`.
+
 Replication never decides where a Workload executes. Replication never replicates Logical Objects — a Logical Object is a reference, not content; there is nothing physical about it to copy.
 
 ## Ownership

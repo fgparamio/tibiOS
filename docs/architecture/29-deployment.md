@@ -6,6 +6,8 @@ Version: 1.0
 
 Deployment answers exactly one question: **should a Runtime instance exist, with what configuration, and for how long?** It is not Scheduling (`16-scheduling-engine.md`), not Orchestration of Workloads, not Replication (`24-replication.md`), and not Networking (`22-networking.md`) — those all operate *inside* a running Runtime. Deployment operates *outside* it.
 
+Diagram: `diagrams/deployment.md`.
+
 Deployment does not know Kubernetes, Docker, Helm, or systemd. Those are technologies that may implement Deployment's decisions, exactly as REST and gRPC implement the Runtime API's capabilities (`26-runtime-api.md`) — the model stays identical whether a Runtime instance is a container, a bare-metal process, or an embedded device.
 
 ```

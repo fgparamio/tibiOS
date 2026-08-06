@@ -6,6 +6,8 @@ Version: 1.0
 
 The Runtime API is the single coherent surface through which anything external — an application, the SDK, the CLI, another TibiOS Runtime — addresses the Runtime. It is not a protocol, not a transport, and not a new domain. It introduces no operation that does not already exist inside a Runtime domain (`13-object-model.md`–`25-ai-runtime.md`); it only makes those operations addressable from outside the Runtime.
 
+Diagram: `diagrams/runtime-api-sdk-cli.md`.
+
 This document does not choose REST, gRPC, or any other protocol. It defines what can be asked of the Runtime, expressed in the Runtime's own language — the same discipline `02-project-structure.md`'s Ports already require: *"Ports express domain language. Ports never expose technology."*
 
 ## Ownership

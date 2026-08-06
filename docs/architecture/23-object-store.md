@@ -20,6 +20,8 @@ Applications and Runtime domains interact with Objects through the Object Store,
 
 This document follows the principles defined in `00-philosophy.md` and `02-project-structure.md`.
 
+Diagram: `diagrams/object-resolution.md`.
+
 ---
 
 ## Ownership

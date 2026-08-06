@@ -569,6 +569,8 @@ Each anti-pattern increases architectural coupling.
 
 ## Architecture Map
 
+Diagram: `diagrams/document-dependency-graph.md`. Glossary: `GLOSSARY.md`.
+
 This document defines structural rules. Other architecture documents define domain behavior.
 
 | Document | Defines |
