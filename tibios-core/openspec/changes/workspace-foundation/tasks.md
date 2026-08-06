@@ -31,10 +31,10 @@ Chain strategy: pending
 
 ## Phase 2: `runtime-primitives` (TDD)
 
-- [ ] 2.1 Create `crates/runtime-primitives/Cargo.toml` (workspace fields, `[lints] workspace=true`, deps `serde`,`ulid`) + `src/lib.rs` `//!` doc citing `02-project-structure.md`. *(Ownership Documented; Exhaustive Dependency Set)*
-- [ ] 2.2 RED: write failing tests for `Lease::is_expired`/`remaining`, `ContentHash::matches`, `ObjectVersion::next`.
-- [ ] 2.3 GREEN: implement `identity.rs` (`ulid_newtype!` macro → `ObjectId, NodeId, RuntimeId, WorkloadId, AllocationId, SessionId, TenantId`), `lease.rs`, `time.rs`, `content.rs`, `error.rs`; re-export all 12 from `lib.rs`. *(The 12 Fundamental Types)*
-- [ ] 2.4 REFACTOR: confirm zero domain logic, no hand-written `trait` beyond derives, deps stay within `{serde, ulid}`. *(Zero Domain Logic; No Public Traits In This Change)*
+- [x] 2.1 Create `crates/runtime-primitives/Cargo.toml` (workspace fields, `[lints] workspace=true`, deps `serde`,`ulid`) + `src/lib.rs` `//!` doc citing `02-project-structure.md`. *(Ownership Documented; Exhaustive Dependency Set)*
+- [x] 2.2 RED: write failing tests for `Lease::is_expired`/`remaining`, `ContentHash::matches`, `ObjectVersion::next`.
+- [x] 2.3 GREEN: implement `identity.rs` (`ulid_newtype!` macro → `ObjectId, NodeId, RuntimeId, WorkloadId, AllocationId, SessionId, TenantId`), `lease.rs`, `time.rs`, `content.rs`, `error.rs`; re-export all 12 from `lib.rs`. *(The 12 Fundamental Types)*
+- [x] 2.4 REFACTOR: confirm zero domain logic, no hand-written `trait` beyond derives, deps stay within `{serde, ulid}`. *(Zero Domain Logic; No Public Traits In This Change)*
 
 ## Phase 3: Domain Crate Stubs (dependency order)
 
