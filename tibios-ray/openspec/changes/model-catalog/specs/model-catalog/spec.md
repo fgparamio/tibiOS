@@ -49,10 +49,10 @@ The system MUST expose `family_of(name: PublishedModelName) -> ModelFamily`, a p
 - WHEN `families()` is called
 - THEN it returns every distinct `ModelFamily` present across catalog entries, none absent
 
-#### Scenario: get returns None for an unknown name
+#### Scenario: get raises UnknownModelError for an unknown name
 - GIVEN a `ModelCatalog`
 - WHEN `get(PublishedModelName("unknown/model"))` is called
-- THEN it returns `None`, not an exception
+- THEN it raises `UnknownModelError`, not `None` — an identity lookup's absence is a caller error, not a data variant (design decision MC7's asymmetric error contract)
 
 #### Scenario: requirements answers footprint for one backend+quantization pair
 - GIVEN an entry with a `BackendSupport` for a given backend and quantization
