@@ -465,6 +465,30 @@ fn is_identifier_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
 }
 
+/// True if `line` names the `adapters` identifier and is not a comment line.
+/// Comment lines are skipped first — a doc comment mentioning "adapters" in
+/// prose (e.g. `/// converted in the adapters/ tree, see docs`) must not
+/// count as a re-export, matching the comment-skip already applied by
+/// `runtime_worker_transport_types_stay_inside_the_private_adapter_module`.
+fn line_names_adapters_identifier(line: &str) -> bool {
+    if line.trim_start().starts_with("//") {
+        return false;
+    }
+    contains_identifier(line, "adapters")
+}
+
+#[test]
+fn line_names_adapters_identifier_skips_comment_lines_but_not_real_code() {
+    assert!(
+        !line_names_adapters_identifier("/// converted in the adapters/ tree, see docs"),
+        "a doc comment mentioning `adapters` in prose must not count as an occurrence"
+    );
+    assert!(
+        line_names_adapters_identifier("mod adapters;"),
+        "the literal `mod adapters;` declaration must still be counted"
+    );
+}
+
 /// Spec scenario "Public API carries no tonic/prost path"
 /// (`runtime-worker/spec.md`): no transport token appears in `src/` outside
 /// `adapters/`.
@@ -503,7 +527,12 @@ fn runtime_worker_transport_types_stay_inside_the_private_adapter_module() {
 /// (`runtime-worker/spec.md`): the identifier `adapters` occurs exactly
 /// once outside `src/adapters/` itself, and that sole occurrence is the bare
 /// `mod adapters;` declaration in `lib.rs` — closing the `pub use
-/// crate::adapters::…` hole that the token scan alone would miss.
+/// crate::adapters::…` hole that the token scan alone would miss. Comment
+/// lines are skipped before scanning, matching
+/// `runtime_worker_transport_types_stay_inside_the_private_adapter_module`'s
+/// own comment-skip behavior, so a doc comment mentioning "adapters" in
+/// prose (plausible once new public modules under `execution/`/`ports/`
+/// start documenting what they are *not*) never trips this guard.
 #[test]
 fn runtime_worker_never_reexports_the_adapter_module() {
     let worker_src = workspace_root().join(WORKER_SRC);
@@ -513,7 +542,7 @@ fn runtime_worker_never_reexports_the_adapter_module() {
         let contents = std::fs::read_to_string(&file)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", file.display()));
         for (line_number, line) in contents.lines().enumerate() {
-            if contains_identifier(line, "adapters") {
+            if line_names_adapters_identifier(line) {
                 occurrences.push((file.clone(), line_number + 1, line.trim().to_string()));
             }
         }
