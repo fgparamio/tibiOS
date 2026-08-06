@@ -2,14 +2,15 @@
 data — the Chat family group").
 
 Filing convenience only (design decision MC12) — the catalog itself is
-keyed by family, not capability. `gemma` (slice 4) is also `vision`'s
-entire answer for that family and is not restated in `entries/vision.py`.
+keyed by family, not capability. `gemma` is also `vision`'s entire
+answer for that family and is not restated in `entries/vision.py`
+(slice 6) — one lineage legitimately serves two capabilities.
 
 `CHAT_ENTRIES` is this module's only exported entry point per family
 group (MC14 — `entries/__init__.py`'s `ALL_ENTRIES`/`DEFAULT_CATALOG`
-assembly is deferred to the final slice). This slice adds `qwen`,
-`llama`, `deepseek`; slice 4 appends `gemma`, `mistral`, `kimi` to the
-same tuple.
+assembly is deferred to the final slice). Slice 3 added `qwen`, `llama`,
+`deepseek`; this slice (4) appends `gemma`, `mistral`, `kimi` to the
+same tuple — all six families now live here.
 
 Every `min_vram_bytes` figure is stated data derived from MC13's formula
 (`ceil_gib(parameter_count x bits/8 x 1.2)`), copied verbatim from
@@ -38,6 +39,9 @@ _GPTQ = Quantization(scheme="gptq", bits=4)
 _QWEN = ModelFamily("qwen")
 _LLAMA = ModelFamily("llama")
 _DEEPSEEK = ModelFamily("deepseek")
+_GEMMA = ModelFamily("gemma")
+_MISTRAL = ModelFamily("mistral")
+_KIMI = ModelFamily("kimi")
 
 QWEN_ENTRIES: tuple[ModelDescriptor, ...] = (
     ModelDescriptor(
@@ -243,7 +247,135 @@ DEEPSEEK_ENTRIES: tuple[ModelDescriptor, ...] = (
     ),
 )
 
-# Union so far — slice 4 appends GEMMA_ENTRIES/MISTRAL_ENTRIES/KIMI_ENTRIES
-# to this same tuple (MC14: entries/__init__.py's assembly is deferred to
-# the final slice, but chat.py's own union lands incrementally).
-CHAT_ENTRIES: tuple[ModelDescriptor, ...] = QWEN_ENTRIES + LLAMA_ENTRIES + DEEPSEEK_ENTRIES
+GEMMA_ENTRIES: tuple[ModelDescriptor, ...] = (
+    ModelDescriptor(
+        # This family's three rows are also the *entire* `gemma` answer
+        # for `vision.understand` (MC8/MC12) — `entries/vision.py`
+        # (slice 6) does not restate them. One lineage legitimately
+        # serves two capabilities; the descriptor <-> catalog harness
+        # (slice 8) checks entry backends against the *union* of every
+        # descriptor advertising `gemma`, not each capability alone.
+        name=PublishedModelName("google/gemma-3-4b-it"),
+        family=_GEMMA,
+        parameter_count=4_300_000_000,
+        context_window=131_072,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=3
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=11
+                ),
+            }
+        ),
+    ),
+    ModelDescriptor(
+        name=PublishedModelName("google/gemma-3-12b-it"),
+        family=_GEMMA,
+        parameter_count=12_200_000_000,
+        context_window=131_072,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=8
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=30
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=8
+                ),
+            }
+        ),
+    ),
+    ModelDescriptor(
+        name=PublishedModelName("google/gemma-3-27b-it"),
+        family=_GEMMA,
+        parameter_count=27_400_000_000,
+        context_window=131_072,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=66
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=17
+                ),
+                BackendSupport(
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP16}), min_vram_bytes=66
+                ),
+            }
+        ),
+    ),
+)
+
+MISTRAL_ENTRIES: tuple[ModelDescriptor, ...] = (
+    ModelDescriptor(
+        name=PublishedModelName("mistralai/Mistral-7B-Instruct-v0.3"),
+        family=_MISTRAL,
+        parameter_count=7_250_000_000,
+        context_window=32_768,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_LLAMA_CPP, quantizations=frozenset({_Q4_K_M}), min_vram_bytes=5
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=18
+                ),
+            }
+        ),
+    ),
+    ModelDescriptor(
+        name=PublishedModelName("mistralai/Mistral-Small-3.2-24B-Instruct-2506"),
+        family=_MISTRAL,
+        parameter_count=24_000_000_000,
+        context_window=131_072,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=58
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=15
+                ),
+            }
+        ),
+    ),
+)
+
+KIMI_ENTRIES: tuple[ModelDescriptor, ...] = (
+    ModelDescriptor(
+        # One entry satisfies the "≥1 entry per advertised family"
+        # invariant. `moonshotai/Kimi-VL-A3B-Instruct` derives to
+        # `kimi_vl`, which no Provider advertises, so it is out of
+        # scope until one does.
+        name=PublishedModelName("moonshotai/Kimi-K2-Instruct"),
+        family=_KIMI,
+        parameter_count=1_000_000_000_000,
+        context_window=131_072,
+        serving=frozenset(
+            {
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_FP8}), min_vram_bytes=1200
+                ),
+                BackendSupport(
+                    backend=_VLLM, quantizations=frozenset({_AWQ, _GPTQ}), min_vram_bytes=600
+                ),
+                BackendSupport(
+                    backend=_TENSORRT_LLM, quantizations=frozenset({_FP8}), min_vram_bytes=1200
+                ),
+            }
+        ),
+    ),
+)
+
+CHAT_ENTRIES: tuple[ModelDescriptor, ...] = (
+    QWEN_ENTRIES
+    + LLAMA_ENTRIES
+    + DEEPSEEK_ENTRIES
+    + GEMMA_ENTRIES
+    + MISTRAL_ENTRIES
+    + KIMI_ENTRIES
+)
