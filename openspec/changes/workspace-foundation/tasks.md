@@ -50,8 +50,8 @@ Each task = `Cargo.toml` (allowed deps only) + `src/lib.rs` doc stub; satisfies 
 - [x] 3.8 `runtime-state` — deps: primitives, object, scheduler, network; cites `17`,`19`; doc-note network edge is data-contract-only (Runtime Events, never Transport/Session).
 - [x] 3.9 `runtime-allocation` — deps: primitives, scheduler, object; cites `15`.
 - [x] 3.10 `runtime-replication` — deps: primitives, object, storage; cites `24`.
-- [ ] 3.11 `runtime-worker` — deps: primitives, allocation, object; cites `18`.
-- [ ] 3.12 `runtime-admission` — deps: primitives, state; cites `20`.
+- [x] 3.11 `runtime-worker` — deps: primitives, allocation, object; cites `18`.
+- [x] 3.12 `runtime-admission` — deps: primitives, state; cites `20`.
 - [ ] 3.13 `runtime-api` — deps: primitives, admission, object, state, allocation, storage, network; cites `26`.
 - [ ] 3.14 `runtime-federation` — deps: primitives, network, replication, api; cites `31`.
 
