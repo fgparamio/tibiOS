@@ -1,22 +1,33 @@
 """Tests for `tibios_ray.catalog.catalog.ModelCatalog` (`design.md` Key
 Contracts, design decisions MC6/MC7).
 
-Slice 2a covers: construction (`_by_name`/`_by_family` indices only),
-`families()`, `models()`, `get()`, and the two construction invariants
-that do not require the `_footprints` index (`DuplicateModelError`,
-`FamilyMismatchError`). `supports()`/`quantizations()`/`requirements()`
-and `AmbiguousFootprintError` land in slice 2b, per the documented 2a/2b
-fallback split (`design.md` Module/Slice Plan).
+Slice 2a covered construction (`_by_name`/`_by_family` indices),
+`families()`, `models()`, `get()`, and the `DuplicateModelError`/
+`FamilyMismatchError` construction invariants. Slice 2b adds
+`TestConstructionInvariants.test_ambiguous_footprint_...` plus
+`TestSupports`/`TestQuantizations`/`TestRequirements` — the
+`_footprints` index, `AmbiguousFootprintError`, and
+`supports()`/`quantizations()`/`requirements()` — per the documented
+2a/2b fallback split (`design.md` Module/Slice Plan).
 
 Tested against a fabricated three-entry fixture catalog, not real data —
 query semantics and catalog data are independent concerns and must fail
-independently.
+independently. The fixture deliberately includes one model with two
+tiers on one backend (`qwen` on `llama_cpp`) and one model absent from a
+backend (`llama` has no `llama_cpp` row), so `supports`/`quantizations`/
+`requirements` all have a real negative case.
 """
 
 from tibios_ray.backends.adapter import BackendId
 from tibios_ray.capabilities.descriptor import ModelFamily
 from tibios_ray.catalog.catalog import ModelCatalog
-from tibios_ray.catalog.errors import DuplicateModelError, FamilyMismatchError, UnknownModelError
+from tibios_ray.catalog.errors import (
+    AmbiguousFootprintError,
+    DuplicateModelError,
+    FamilyMismatchError,
+    UnknownModelError,
+    UnsupportedServingError,
+)
 from tibios_ray.catalog.model import BackendSupport, ModelDescriptor
 from tibios_ray.catalog.names import PublishedModelName
 from tibios_ray.selection.policy import Quantization
@@ -164,3 +175,99 @@ class TestConstructionInvariants:
             assert error.derived == ModelFamily("qwen")
         else:
             raise AssertionError("expected FamilyMismatchError")
+
+    def test_ambiguous_footprint_raises_ambiguous_footprint_error(self) -> None:
+        # Two BackendSupport rows sharing the same (backend, quantization)
+        # pair — the ambiguity the `_footprints` index cannot represent.
+        ambiguous = ModelDescriptor(
+            name=_QWEN_NAME,
+            family=ModelFamily("qwen"),
+            parameter_count=8_200_000_000,
+            context_window=32_768,
+            serving=frozenset(
+                {
+                    BackendSupport(
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=20
+                    ),
+                    BackendSupport(
+                        backend=_VLLM, quantizations=frozenset({_FP16}), min_vram_bytes=21
+                    ),
+                }
+            ),
+        )
+        try:
+            ModelCatalog([ambiguous])
+        except AmbiguousFootprintError as error:
+            assert error.name == _QWEN_NAME
+            assert error.backend == _VLLM
+            assert error.quantization == _FP16
+        else:
+            raise AssertionError("expected AmbiguousFootprintError")
+
+
+class TestSupports:
+    def test_true_for_a_backend_the_model_serves(self) -> None:
+        catalog = _catalog()
+        assert catalog.supports(_QWEN_NAME, _LLAMA_CPP) is True
+
+    def test_false_for_a_known_model_on_an_unadvertised_backend(self) -> None:
+        catalog = _catalog()
+        assert catalog.supports(_LLAMA_NAME, _LLAMA_CPP) is False
+
+    def test_raises_unknown_model_error_for_an_unknown_model(self) -> None:
+        catalog = _catalog()
+        try:
+            catalog.supports(PublishedModelName("unknown/model"), _VLLM)
+        except UnknownModelError:
+            pass
+        else:
+            raise AssertionError("expected UnknownModelError")
+
+
+class TestQuantizations:
+    def test_unions_across_every_row_sharing_a_backend(self) -> None:
+        # qwen carries two BackendSupport rows on llama_cpp (q4_k_m,
+        # q8_0) — MC5's multi-tier-per-backend shape, exercised end to
+        # end through the query surface.
+        catalog = _catalog()
+        assert catalog.quantizations(_QWEN_NAME, _LLAMA_CPP) == frozenset({_Q4_K_M, _Q8_0})
+
+    def test_empty_when_supports_is_false(self) -> None:
+        catalog = _catalog()
+        assert catalog.quantizations(_LLAMA_NAME, _LLAMA_CPP) == frozenset()
+
+    def test_raises_unknown_model_error_for_an_unknown_model(self) -> None:
+        catalog = _catalog()
+        try:
+            catalog.quantizations(PublishedModelName("unknown/model"), _VLLM)
+        except UnknownModelError:
+            pass
+        else:
+            raise AssertionError("expected UnknownModelError")
+
+
+class TestRequirements:
+    def test_returns_min_vram_bytes_for_the_exact_triple(self) -> None:
+        catalog = _catalog()
+        assert catalog.requirements(_QWEN_NAME, _LLAMA_CPP, _Q4_K_M) == 5
+        assert catalog.requirements(_QWEN_NAME, _LLAMA_CPP, _Q8_0) == 10
+
+    def test_raises_unsupported_serving_error_for_a_pair_not_in_the_serving_table(self) -> None:
+        catalog = _catalog()
+        try:
+            catalog.requirements(_LLAMA_NAME, _LLAMA_CPP, _AWQ)
+        except UnsupportedServingError as error:
+            assert error.name == _LLAMA_NAME
+            assert error.backend == _LLAMA_CPP
+            assert error.quantization == _AWQ
+        else:
+            raise AssertionError("expected UnsupportedServingError")
+
+    def test_raises_unknown_model_error_for_an_unknown_model(self) -> None:
+        catalog = _catalog()
+        try:
+            catalog.requirements(PublishedModelName("unknown/model"), _VLLM, _FP16)
+        except UnknownModelError:
+            pass
+        else:
+            raise AssertionError("expected UnknownModelError")
