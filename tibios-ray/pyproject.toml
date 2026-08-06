@@ -33,3 +33,4 @@ select = ["E", "F", "I"]
 include = ["src", "tests"]
 typeCheckingMode = "standard"
 pythonVersion = "3.14"
+reportUnnecessaryTypeIgnoreComment = true
