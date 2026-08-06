@@ -41,9 +41,10 @@ Accepted, explicit limitations (design.md):
 
 import asyncio
 import importlib
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import uuid4
 
 from tibios_ray.backends.adapter import BackendId, BackendSession, ServingPlanLike
@@ -159,16 +160,19 @@ class _ModelRuntime:
 
     engine: AsyncLLMLike
     refcount: int = 0
-    pending: set[Any] = field(default_factory=set)
+    pending: set[asyncio.Task[None]] = field(default_factory=set)
 
 
 @dataclass(frozen=True, slots=True)
 class _SessionEntry:
     """One acquired session's borrow of the shared `_ModelRuntime`
-    (VL2's `_sessions: dict[session_id, _SessionEntry]`). `live` starts
-    empty and is populated by `generate()` in PR 2 (VL14)."""
+    (VL2's `_sessions: dict[session_id, _SessionEntry]`). `live` tracks
+    this session's in-flight `generate()` streams, keyed by
+    `request_id` (VL14) — consulted by `release()` to abort any
+    stranded stream before tearing down a zero-refcount engine."""
 
     runtime: _ModelRuntime
+    live: dict[str, AsyncGenerator[RequestOutputLike, None]] = field(default_factory=dict)
 
 
 class VllmTextBackend:
@@ -233,6 +237,12 @@ class VllmTextBackend:
                 raise UnknownSessionError(session.session_id)
 
             runtime = entry.runtime
+            # VL13/VL14: any stream this session never drained to
+            # completion is stranded — finalize (abort) it explicitly
+            # rather than leaving it to the engine's GC.
+            for live_request_id, live_stream in list(entry.live.items()):
+                _schedule_finalize(runtime, live_stream, live_request_id, abort=True)
+
             runtime.refcount -= 1
             if runtime.refcount == 0:
                 # Teardown while still holding the lock (VL13): a
@@ -241,6 +251,13 @@ class VllmTextBackend:
                 # teardown) or entirely after the slot is cleared below
                 # (it constructs a fresh engine) — no interleaving in
                 # which a session borrows an engine being shut down.
+                #
+                # `release()` is the deterministic join point (VL13):
+                # drain every scheduled-but-not-yet-joined finalize
+                # task (this session's own, plus any left over from
+                # earlier sessions of the same engine) before shutdown.
+                if runtime.pending:
+                    await asyncio.gather(*list(runtime.pending))
                 await asyncio.to_thread(runtime.engine.shutdown)
                 self._runtime = None
 
@@ -249,33 +266,87 @@ class VllmTextBackend:
     ) -> AsyncIterator[TextChunk]:
         entry = self._session_for(session)
         request_id = f"{session.session_id}:{uuid4().hex}"
-        stream = entry.runtime.engine.generate(
-            prompt=request.prompt,
-            sampling_params=self._params_factory(request),
-            request_id=request_id,
+        stream = cast(
+            "AsyncGenerator[RequestOutputLike, None]",
+            entry.runtime.engine.generate(
+                prompt=request.prompt,
+                sampling_params=self._params_factory(request),
+                request_id=request_id,
+            ),
         )
-        # VL5: no lock — concurrent multiplexed requests across
-        # sessions of the same engine is the entire reason to run
-        # vLLM. This async-for is the entire call path: no bridge
-        # thread, no bounded queue, nothing bridging it to the loop.
-        async for output in stream:
-            text = output.outputs[0].text if output.outputs else ""
-            if output.finished:
-                # VL10: the terminal chunk is sourced straight from
-                # the SDK's own `finished` field — no lookahead.
-                yield TextChunk(text=text, finished=True)
-                return
-            if text:  # drop empty non-terminal deltas
-                yield TextChunk(text=text, finished=False)
-        # VL10: defensive synthetic terminator — the SDK generator
-        # exhausted without ever setting finished=True.
-        yield TextChunk(text="", finished=True)
+        entry.live[request_id] = stream
+        completed = False
+        try:
+            # VL5: no lock — concurrent multiplexed requests across
+            # sessions of the same engine is the entire reason to run
+            # vLLM. This async-for is the entire call path: no bridge
+            # thread, no bounded queue, nothing bridging it to the loop.
+            async for output in stream:
+                text = output.outputs[0].text if output.outputs else ""
+                if output.finished:
+                    # VL10: the terminal chunk is sourced straight from
+                    # the SDK's own `finished` field — no lookahead.
+                    completed = True
+                    yield TextChunk(text=text, finished=True)
+                    return
+                if text:  # drop empty non-terminal deltas
+                    yield TextChunk(text=text, finished=False)
+            # VL10: defensive synthetic terminator — the SDK generator
+            # exhausted without ever setting finished=True.
+            completed = True
+            yield TextChunk(text="", finished=True)
+        finally:
+            # VL11: await-free — abandonment (aclose()) and task
+            # cancellation both resume execution here, and a direct
+            # `await` would be immediately re-cancelled under the
+            # latter, silently skipping the abort. Schedule a
+            # background task instead and let it be joined elsewhere
+            # (release(), VL13).
+            entry.live.pop(request_id, None)
+            _schedule_finalize(entry.runtime, stream, request_id, abort=not completed)
 
     def _session_for(self, session: BackendSession) -> _SessionEntry:
         entry = self._sessions.get(session.session_id)
         if entry is None:
             raise UnknownSessionError(session.session_id)
         return entry
+
+
+def _schedule_finalize(
+    runtime: _ModelRuntime,
+    stream: AsyncGenerator[RequestOutputLike, None],
+    request_id: str,
+    *,
+    abort: bool,
+) -> None:
+    """Schedules `_finalize` as a background task and registers it in
+    `runtime.pending` (VL11/VL13) — never awaited directly from
+    `generate()`'s `finally`. A missing/closed loop (e.g. interpreter
+    shutdown) is swallowed: there is nothing left to join it against."""
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    task = loop.create_task(_finalize(runtime.engine, stream, request_id, abort=abort))
+    runtime.pending.add(task)
+    task.add_done_callback(runtime.pending.discard)
+
+
+async def _finalize(
+    engine: AsyncLLMLike,
+    stream: AsyncGenerator[RequestOutputLike, None],
+    request_id: str,
+    *,
+    abort: bool,
+) -> None:
+    # VL12: always issue both calls, exception-suppressed — never rely
+    # on engine-side propagation across v0/v1 SDK versions.
+    if abort:
+        with suppress(Exception):
+            await engine.abort(request_id)
+    with suppress(Exception):
+        await stream.aclose()
 
 
 def _new_session_id() -> str:
