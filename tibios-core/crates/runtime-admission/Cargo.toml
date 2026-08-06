@@ -1,0 +1,12 @@
+[package]
+name = "runtime-admission"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+runtime-primitives = { workspace = true }
+runtime-state = { workspace = true }

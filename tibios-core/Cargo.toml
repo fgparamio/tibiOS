@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/runtime-primitives",
+    "crates/runtime-object",
+    "crates/runtime-scheduler",
+    "crates/runtime-allocation",
+    "crates/runtime-admission",
+    "crates/runtime-worker",
+    "crates/runtime-network",
+    "crates/runtime-storage",
+    "crates/runtime-security",
+    "crates/runtime-observability",
+    "crates/runtime-state",
+    "crates/runtime-replication",
+    "crates/runtime-deployment",
+    "crates/runtime-api",
+    "crates/runtime-federation",
+    "runtime",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+rust-version = "1.93"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+ulid = { version = "1", features = ["serde"] }
+cargo_metadata = "0.19"
+runtime-primitives = { path = "crates/runtime-primitives" }
+runtime-object = { path = "crates/runtime-object" }
+runtime-scheduler = { path = "crates/runtime-scheduler" }
+runtime-allocation = { path = "crates/runtime-allocation" }
+runtime-admission = { path = "crates/runtime-admission" }
+runtime-worker = { path = "crates/runtime-worker" }
+runtime-network = { path = "crates/runtime-network" }
+runtime-storage = { path = "crates/runtime-storage" }
+runtime-security = { path = "crates/runtime-security" }
+runtime-observability = { path = "crates/runtime-observability" }
+runtime-state = { path = "crates/runtime-state" }
+runtime-replication = { path = "crates/runtime-replication" }
+runtime-deployment = { path = "crates/runtime-deployment" }
+runtime-api = { path = "crates/runtime-api" }
+runtime-federation = { path = "crates/runtime-federation" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"

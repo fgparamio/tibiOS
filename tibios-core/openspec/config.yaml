@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Rust (Cargo workspace, edition 2024), no code yet beyond cargo-new placeholder.
+  Architecture: frozen normative spec in docs/architecture/ (tag architecture-v1.0, commit 8f11d0a).
+    Source of truth for crate layout: 02-project-structure.md (Project Layout, Dependency Rule,
+    Domain Isolation, Runtime Primitives, Identity Model, Dependency Constraints, Composition Root).
+  Testing: cargo test --workspace
+  Style: cargo fmt; cargo clippy -- -D warnings; conventional commits, no AI attribution.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Every requirement MUST cite the owning docs/architecture/ document
+  design:
+    - Document architecture decisions with rationale
+    - Never contradict docs/architecture/; that corpus is frozen
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow docs/architecture/ naming exactly
+    tdd: true
+    test_command: "cargo test --workspace"
+  verify:
+    test_command: "cargo test --workspace"
+    build_command: "cargo check --workspace"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
