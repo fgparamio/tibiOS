@@ -12,10 +12,6 @@ use tokio::sync::mpsc;
 /// last live `MpscExecutionChannel` closes the channel deterministically
 /// (`design.md` D9: `main.rs` must move only the `Sender` in, never a
 /// clone).
-///
-/// `#[allow(dead_code)]`: not yet constructed from `main.rs` — that wiring
-/// lands in PR 3 of this change (`design.md` D9). Remove this allow there.
-#[allow(dead_code)]
 pub struct MpscExecutionChannel {
     sender: mpsc::Sender<ExecutionEvent>,
 }
@@ -24,7 +20,6 @@ impl MpscExecutionChannel {
     /// Builds an `MpscExecutionChannel` from the `Sender` half of a
     /// `tokio::sync::mpsc::channel`.
     #[must_use]
-    #[allow(dead_code)] // see the struct's doc comment
     pub const fn new(sender: mpsc::Sender<ExecutionEvent>) -> Self {
         Self { sender }
     }

@@ -51,7 +51,7 @@ Chain strategy: stacked-to-main
 
 ## PR 3 — `main.rs` Wiring + Smoke (base: PR 2 branch)
 
-- [ ] 3.1 RED — `runtime/tests/smoke.rs`: run `Command::new(env!("CARGO_BIN_EXE_runtime"))`, assert stdout contains `EndOfStream` and a `Completed` report, exit success.
-- [ ] 3.2 GREEN — `runtime/src/main.rs`: `#[tokio::main]`, `mpsc::channel(CHANNEL_CAPACITY)`, `MpscExecutionChannel::new(sender)` (sole `Sender`, moved in), `worker::in_process_worker()`, `tokio::spawn` drain loop — **never `tokio::join!`** (deadlocks: it keeps `execute`'s `Sender` alive so `recv()` never sees `None`), await `execute`, then await drain, print report — to pass 3.1.
-- [ ] 3.3 (structural, exempt) Sync `openspec/specs/runtime-composition-root/spec.md`: retire "No Public Traits In This Change", add "Runtime Wires One Real Execution End-To-End" + "Runtime Is The Sole Crate Permitted An Async Runtime Dependency" (mirror the change's own spec delta).
-- [ ] 3.4 Verify: `cargo run -p runtime` prints terminal report; `cargo test --workspace`; `cargo clippy --all-targets -- -D warnings`; `cargo fmt`.
+- [x] 3.1 RED — `runtime/tests/smoke.rs`: run `Command::new(env!("CARGO_BIN_EXE_runtime"))`, assert stdout contains `EndOfStream` and a `Completed` report, exit success.
+- [x] 3.2 GREEN — `runtime/src/main.rs`: `#[tokio::main]`, `mpsc::channel(CHANNEL_CAPACITY)`, `MpscExecutionChannel::new(sender)` (sole `Sender`, moved in), `worker::in_process_worker()`, `tokio::spawn` drain loop — **never `tokio::join!`** (deadlocks: it keeps `execute`'s `Sender` alive so `recv()` never sees `None`), await `execute`, then await drain, print report — to pass 3.1.
+- [x] 3.3 (structural, exempt) Sync `openspec/specs/runtime-composition-root/spec.md`: retire "No Public Traits In This Change", add "Runtime Wires One Real Execution End-To-End" + "Runtime Is The Sole Crate Permitted An Async Runtime Dependency" (mirror the change's own spec delta).
+- [x] 3.4 Verify: `cargo run -p runtime` prints terminal report; `cargo test --workspace`; `cargo clippy --all-targets -- -D warnings`; `cargo fmt`.

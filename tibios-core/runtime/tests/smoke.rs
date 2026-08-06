@@ -1,0 +1,33 @@
+//! Smoke test (design.md D10, Slice 3): `runtime` stays binary-only, so this
+//! integration test cannot import its modules — it instead runs the actual
+//! built binary via `Command::new(env!("CARGO_BIN_EXE_runtime"))` and
+//! inspects its stdout, proving the real `cargo run -p runtime` success
+//! criterion end-to-end, not a library approximation
+//! (`runtime-composition-root/spec.md` — "Runtime Wires One Real Execution
+//! End-To-End", scenario "cargo run -p runtime prints a terminal report").
+
+use std::process::Command;
+
+#[test]
+fn running_the_runtime_binary_prints_an_end_of_stream_event_and_a_completed_report() {
+    let output = Command::new(env!("CARGO_BIN_EXE_runtime"))
+        .output()
+        .expect("the runtime binary must be spawnable");
+
+    assert!(
+        output.status.success(),
+        "the runtime binary must exit successfully, stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout must be valid UTF-8");
+
+    assert!(
+        stdout.contains("EndOfStream"),
+        "expected stdout to contain an `EndOfStream` event, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("Completed"),
+        "expected stdout to contain a `Completed` terminal report, got:\n{stdout}"
+    );
+}
