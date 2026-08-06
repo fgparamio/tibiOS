@@ -579,8 +579,9 @@ requires-dist = [
     { name = "llama-cpp-python", marker = "extra == 'llamacpp'", specifier = ">=0.3.34,<0.4" },
     { name = "protobuf", specifier = ">=7.35.1" },
     { name = "ray", specifier = ">=2.56.1" },
+    { name = "vllm", marker = "python_full_version < '3.14' and extra == 'vllm'", specifier = ">=0.9.0,<0.10" },
 ]
-provides-extras = ["llamacpp"]
+provides-extras = ["llamacpp", "vllm"]
 
 [package.metadata.requires-dev]
 dev = [

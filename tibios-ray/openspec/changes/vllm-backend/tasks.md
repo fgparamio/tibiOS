@@ -27,11 +27,11 @@ Strict TDD active (`uv run pytest`). Each numbered task is RED (failing test) th
 
 ## PR 1 — Model Runtime + Residency
 
-- [ ] 1.1 `pyproject.toml`: add `vllm` optional extra (mirrors `llamacpp` extra); comment noting torch/CUDA coupling.
-- [ ] 1.2 RED: typed-binding conformance test (`_b: TextGenerationBackend = VllmTextBackend(...)`). GREEN: create `engines/vllm.py` with `AsyncLLMLike`/`RequestOutputLike`/`CompletionOutputLike` Protocols, `VLLM_BACKEND_ID`, `UnknownSessionError`, empty `VllmTextBackend` skeleton.
-- [ ] 1.3 Create `tests/unit/engines/stub_async_llm.py`: `StubAsyncLLM`, `StubRequestOutput`, recording params factory (`stub_llama.py` precedent).
-- [ ] 1.4 RED: import-SDK-free test (`"vllm"`/`"torch"` absent from `sys.modules` after import). GREEN: `default_engine_factory` with lazy `importlib` import (LC11).
-- [ ] 1.5 RED: `supports()` True/False across BackendIds incl. plan exposing only `.backend` (VL4). GREEN: implement `supports()`.
+- [x] 1.1 `pyproject.toml`: add `vllm` optional extra (mirrors `llamacpp` extra); comment noting torch/CUDA coupling.
+- [x] 1.2 RED: typed-binding conformance test (`_b: TextGenerationBackend = VllmTextBackend(...)`). GREEN: create `engines/vllm.py` with `AsyncLLMLike`/`RequestOutputLike`/`CompletionOutputLike` Protocols, `VLLM_BACKEND_ID`, `UnknownSessionError`, empty `VllmTextBackend` skeleton.
+- [x] 1.3 Create `tests/unit/engines/stub_async_llm.py`: `StubAsyncLLM`, `StubRequestOutput`, recording params factory (`stub_llama.py` precedent).
+- [x] 1.4 RED: import-SDK-free test (`"vllm"`/`"torch"` absent from `sys.modules` after import). GREEN: `default_engine_factory` with lazy `importlib` import (LC11).
+- [x] 1.5 RED: `supports()` True/False across BackendIds incl. plan exposing only `.backend` (VL4). GREEN: implement `supports()`.
 - [ ] 1.6 RED: first/second `acquire()` reuse one engine; two models get two engines (VL2/VL3). GREEN: `_ModelRuntime` dataclass, `acquire()` construct-or-reuse + refcount increment under `self._lock` (VL5).
 - [ ] 1.7 RED: concurrent-first-acquire barrier test asserting exactly one construction (VL6, highest-severity risk). GREEN: single-flight lock+double-check, no `await` between factory return and slot assignment.
 - [ ] 1.8 RED: release-last shuts down engine; release-non-last keeps it running (VL13). GREEN: `release()` pop-under-lock, decrement, teardown at zero via `asyncio.to_thread(engine.shutdown)`.
