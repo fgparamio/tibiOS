@@ -4,7 +4,9 @@ This project is one of two Worker implementations for TibiOS's Runtime — the h
 
 ## Before touching the gRPC Worker interface
 
-Read these first, from the sibling repo `../tibios-core`, pinned at git tag `architecture-v1.0`:
+`tibios-core` and `tibios-ray` are two directories in one shared git repository (single `.git` at the `TibiOS/` root, not separate repos) — `git log`/`git branch` here reflect the whole monorepo, not just this directory.
+
+Read these first, from `../tibios-core`, pinned at git tag `architecture-v1.0`:
 
 - `../tibios-core/docs/architecture/18-worker-model.md` — the Worker contract itself: Execution Context, Execution Channel, Execution Events, Execution Report, Execution Pulse, cancellation semantics, the four execution patterns (Batch/Streaming/Long-running Service/Pipeline).
 - `../tibios-core/docs/architecture/25-ai-runtime.md` — confirms tibios-ray gets no special treatment: it is a Worker like any other, executing ordinary Objects (`13-object-model.md`) and Resources (`14-resource-model.md`).
@@ -13,7 +15,7 @@ Do not duplicate that spec here. If something here seems to contradict it, the c
 
 ## Contract surface
 
-The gRPC/proto contract between `tibios-core` and `tibios-ray` must live in exactly one place, shared by both repos (not yet created — proposed location: `../TibiOS/proto/`, a sibling of both repos, since both a Rust and a Python build need to compile against it). Until that exists, treat the Worker contract in `18-worker-model.md` as the source of truth for what the interface must express, even before the concrete `.proto` file exists.
+The gRPC/proto contract between `tibios-core` and `tibios-ray` lives in `../proto/` (sibling of both directories, so both the Rust and the Python build compile against it). `tibios-ray` does not yet consume it — the `.proto` is ahead of this codebase (e.g. `ExecutionContext.worker_capability` has no Ray-side wiring yet). Where this codebase and the `.proto` disagree, the `.proto` wins; treat `18-worker-model.md` as the source of truth only for interface behavior the `.proto` doesn't yet express.
 
 ## Conventions
 
