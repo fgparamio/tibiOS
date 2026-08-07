@@ -19,3 +19,9 @@ pub use execution::event::{
 };
 pub use execution::report::{CancelAck, ExecutionPhase, ExecutionPulse, ExecutionReport};
 pub use ports::{ChannelClosed, ExecutionChannel, WorkerService};
+
+// Composition-Root factory exception (`runtime-worker/spec.md`): the only
+// items ever allowed to cross the `adapters/` boundary are opaque factory
+// functions returning `impl <public port>` — never an adapter module or
+// adapter type. `runtime`'s Composition Root is the sole intended caller.
+pub use adapters::new_ray_worker;

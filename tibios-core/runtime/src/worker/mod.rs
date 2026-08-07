@@ -9,11 +9,13 @@ mod channel;
 mod conformance;
 mod in_process;
 mod local_infer;
+mod ray_dispatch;
 mod registry;
 
 use any::AnyWorker;
 use in_process::InProcessWorker;
 use local_infer::build_local_infer_worker;
+use ray_dispatch::RayDispatch;
 use runtime_worker::WorkerService;
 
 pub use channel::MpscExecutionChannel;
@@ -22,13 +24,20 @@ pub use channel::MpscExecutionChannel;
 /// builds (`runtime-composition-root/spec.md`; design.md D10).
 pub enum WorkerKind {
     /// Never selected by `main.rs` — the plain `bin` target always picks
-    /// `LocalInfer` — but exercised via `any_worker(WorkerKind::InProcess)`
-    /// by `any.rs`'s own conformance-suite invocations and eagerness test.
+    /// `Ray` — but exercised via `any_worker(WorkerKind::InProcess)` by
+    /// `any.rs`'s own conformance-suite invocations and eagerness test.
     /// Precedent for a variant-level allow (not module-level):
     /// `crates/runtime-worker/src/adapters/grpc/convert.rs:481`.
     #[allow(dead_code)]
     InProcess,
+    /// Never selected by `main.rs` (see `InProcess`'s doc comment) —
+    /// exercised only via `runtime/src/worker/conformance.rs`'s own
+    /// conformance-suite invocation.
+    #[allow(dead_code)]
     LocalInfer,
+    /// Carries the `tibios-ray` gRPC endpoint (`worker-grpc-client-adapter/design.md`
+    /// D2) — `main.rs` reads it from `TIBIOS_RAY_ENDPOINT`.
+    Ray(String),
 }
 
 /// Builds a `WorkerService`, selecting the concrete implementation via
@@ -42,5 +51,8 @@ pub fn any_worker(kind: WorkerKind) -> impl WorkerService {
     match kind {
         WorkerKind::InProcess => AnyWorker::InProcess(InProcessWorker::new()),
         WorkerKind::LocalInfer => AnyWorker::LocalInfer(build_local_infer_worker()),
+        WorkerKind::Ray(endpoint) => AnyWorker::Ray(Box::new(RayDispatch(
+            runtime_worker::new_ray_worker(endpoint),
+        ))),
     }
 }
