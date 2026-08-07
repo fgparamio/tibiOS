@@ -26,7 +26,7 @@ from tibios_ray.execution.context import (
     SecurityContext,
 )
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
-from tibios_ray.execution.report import ExecutionPhase
+from tibios_ray.execution.report import ExecutionPhase, ExecutionReport
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
 from tibios_ray.transport.errors import (
@@ -273,7 +273,7 @@ def workload_id_from_pulse_request(message: worker_pb2.PulseRequest) -> Workload
 # --- Outbound (domain -> wire): ExecutionPhase, ExecutionReport, ---
 # --- ExecutionEvent, ExecutionPulse (S3b, D16's closed lossiness list) ---
 
-_PHASE_TO_WIRE: Mapping[ExecutionPhase, int] = {
+_PHASE_TO_WIRE: Mapping[ExecutionPhase, worker_pb2.ExecutionPhase] = {
     ExecutionPhase.RECEIVED: worker_pb2.EXECUTION_PHASE_RECEIVED,
     ExecutionPhase.PREPARED: worker_pb2.EXECUTION_PHASE_PREPARED,
     ExecutionPhase.RUNNING: worker_pb2.EXECUTION_PHASE_RUNNING,
@@ -287,7 +287,7 @@ assert set(_PHASE_TO_WIRE) == set(ExecutionPhase), (
 )
 
 
-def phase_to_wire(phase: ExecutionPhase) -> int:
+def phase_to_wire(phase: ExecutionPhase) -> worker_pb2.ExecutionPhase:
     """Domain `ExecutionPhase` -> wire `ExecutionPhase` enum int,
     exhaustively mapped via `_PHASE_TO_WIRE`; `EXECUTION_PHASE_UNSPECIFIED`
     is never produced (`worker-wire-conversion` — "Every domain phase maps
@@ -310,3 +310,34 @@ def duration_to_wire(duration: timedelta, *, field: str) -> duration_pb2.Duratio
     result = duration_pb2.Duration()
     result.FromTimedelta(duration)
     return result
+
+
+def execution_report_to_wire(report: ExecutionReport) -> worker_pb2.ExecutionReport:
+    """Domain `ExecutionReport` -> wire `ExecutionReport` — a lossy
+    projection, per D16 (``design.md``):
+
+    - `phase` -> `final_phase` via `phase_to_wire` (never
+      `EXECUTION_PHASE_UNSPECIFIED`).
+    - `duration` -> `duration` via `duration_to_wire`; a negative value
+      raises `NegativeDurationError` (D9 Consequences).
+    - `trace_id` -> `trace_id` verbatim (D16 row: "Mapped verbatim").
+    - `failure`/`phase` -> `summary`: `failure` set folds into `summary`
+      verbatim; `failure is None` folds to `summary == ""` (D16 row:
+      "Folded... two tests, not a silent default").
+    - `resource_usage`/`metrics` are **never** set on the wire message —
+      the wire `ExecutionReport` has no such field at all (D16 row:
+      "Dropped, by contract design... The transport does not synthesize
+      one"). The wire relocated point-in-time metrics to the event
+      stream's `MetricsSnapshot` arm instead; this function performs no
+      synthesis from a Report's `resource_usage`/`metrics` into that arm.
+    - `logs` is **never** carried onto the wire — the wire `ExecutionReport`
+      has no `logs` field (D16 row: "Dropped... the correct fix, if ever
+      needed, is a `.proto` change").
+    """
+
+    return worker_pb2.ExecutionReport(
+        final_phase=phase_to_wire(report.phase),
+        duration=duration_to_wire(report.duration, field="ExecutionReport.duration"),
+        trace_id=report.trace_id,
+        summary=report.failure if report.failure is not None else "",
+    )

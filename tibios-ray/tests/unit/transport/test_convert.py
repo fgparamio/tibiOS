@@ -16,7 +16,7 @@ from google.protobuf import duration_pb2
 
 from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
-from tibios_ray.execution.report import ExecutionPhase
+from tibios_ray.execution.report import ExecutionPhase, ExecutionReport
 from tibios_ray.testing.cancellation import ManualCancellation
 from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
@@ -639,3 +639,96 @@ class TestDurationToWire:
             duration_to_wire(timedelta(seconds=-1), field="ExecutionReport.duration")
         assert excinfo.value.error_class is ErrorClass.PERMANENT
         assert "ExecutionReport.duration" in str(excinfo.value)
+
+
+def _report(**overrides: object) -> ExecutionReport:
+    defaults: dict[str, object] = {
+        "phase": ExecutionPhase.COMPLETED,
+        "duration": timedelta(seconds=2),
+        "resource_usage": {"cpu_seconds": 1.5},
+        "metrics": {"tokens": 42.0},
+        "trace_id": "trace-1",
+        "logs": ("line one", "line two"),
+        "failure": None,
+    }
+    defaults.update(overrides)
+    return ExecutionReport(**defaults)  # type: ignore[arg-type]
+
+
+class TestExecutionReportToWire:
+    """3b.2-3b.6 — `execution_report_to_wire`'s outbound fields plus D16's
+    closed lossiness list for `ExecutionReport`."""
+
+    def test_negative_duration_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(duration=timedelta(seconds=-1))
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            execution_report_to_wire(report)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_trace_id_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(trace_id="trace-verbatim")
+
+        result = execution_report_to_wire(report)
+
+        assert result.trace_id == "trace-verbatim"
+
+    def test_failed_report_sets_summary_to_failure_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.FAILED, failure="something broke")
+
+        result = execution_report_to_wire(report)
+
+        assert result.summary == "something broke"
+
+    def test_successful_report_sets_summary_to_empty_string(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.COMPLETED, failure=None)
+
+        result = execution_report_to_wire(report)
+
+        assert result.summary == ""
+
+    def test_final_phase_and_duration_map_correctly(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.CANCELLED, duration=timedelta(seconds=3))
+
+        result = execution_report_to_wire(report)
+
+        assert result.final_phase == worker_pb2.EXECUTION_PHASE_CANCELLED
+        assert result.duration.ToTimedelta() == timedelta(seconds=3)
+
+    def test_wire_report_never_carries_resource_usage_or_metrics(self) -> None:
+        """D16 row: `resource_usage`/`metrics` — "Dropped, by contract
+        design... The transport does not synthesize one." The wire
+        `ExecutionReport` message structurally has no such field
+        (`__slots__ = ("final_phase", "duration", "trace_id", "summary")`),
+        so this asserts the wire type itself carries no such field rather
+        than merely checking a value."""
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(resource_usage={"cpu_seconds": 99.0}, metrics={"tokens": 100.0})
+
+        result = execution_report_to_wire(report)
+
+        assert not hasattr(result, "resource_usage")
+        assert not hasattr(result, "metrics")
+
+    def test_wire_report_never_carries_logs(self) -> None:
+        """D16 row: `logs` — "Dropped... the correct fix, if ever needed,
+        is a `.proto` change." The wire `ExecutionReport` message
+        structurally has no `logs` field."""
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(logs=("a log line",))
+
+        result = execution_report_to_wire(report)
+
+        assert not hasattr(result, "logs")
