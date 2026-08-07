@@ -18,9 +18,15 @@ The Worker Runtime MUST drive the full Worker Contract lifecycle (Execution Cont
 
 #### Scenario: Cancellation propagates to the active execution
 
+- GIVEN an execution in progress, correlated by its `WorkloadId`
+- WHEN a `Cancel` request for that `WorkloadId` is received (`Cancel(CancelRequest) returns (CancelAck)` — never `Pulse`)
+- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider, emits final Events and a terminal `EndOfStream` on the Channel, and returns the Report per the Worker Contract — the `CancelAck` returned by `Cancel` means only "accepted", never "terminated"; completion is observed solely on the `SubmitJob` response stream, where the Report remains the final message in every outcome, including cancellation (D14)
+
+#### Scenario: Pulse reports health without affecting execution state
+
 - GIVEN an execution in progress
-- WHEN a cancellation signal (Pulse) is received
-- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider, emits final Events and a terminal `EndOfStream` on the Channel, and returns the Report per the Worker Contract
+- WHEN a `Pulse` request for its `WorkloadId` is received
+- THEN the gRPC transport reports a transport-observable phase (registered vs. task started) and health without altering execution lifecycle in any way — `Pulse` never triggers cancellation, completion, or any other state transition; the Worker Runtime itself publishes no phase transitions, so this is answered from the transport's in-flight registry, not from the Worker Runtime
 
 ### Requirement: Dispatch Only via Capability Registry
 
