@@ -13,7 +13,9 @@ from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
 from tibios_ray.execution.context import (
     AllocationContract,
     ExecutionContext,
+    ObservabilityContext,
     ResolvedModelRef,
+    SecurityContext,
 )
 from tibios_ray.execution.events import (
     CheckpointCreated,
@@ -24,11 +26,18 @@ from tibios_ray.execution.events import (
     Progress,
     Warning,
 )
-from tibios_ray.execution.ids import ContentHash, ObjectId, ObjectVersion
+from tibios_ray.execution.ids import (
+    AllocationId,
+    ContentHash,
+    ObjectId,
+    ObjectVersion,
+    WorkloadId,
+)
 from tibios_ray.execution.report import ExecutionPhase, ExecutionPulse, ExecutionReport
 
 __all__ = [
     "AllocationContract",
+    "AllocationId",
     "CancellationToken",
     "CheckpointCreated",
     "ContentHash",
@@ -42,8 +51,11 @@ __all__ = [
     "MetricsSnapshot",
     "ObjectId",
     "ObjectVersion",
+    "ObservabilityContext",
     "OutputChunk",
     "Progress",
     "ResolvedModelRef",
+    "SecurityContext",
     "Warning",
+    "WorkloadId",
 ]

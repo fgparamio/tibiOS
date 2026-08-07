@@ -9,6 +9,7 @@ import tibios_ray.execution as execution
 def test_package_exports_all_phase_1_public_names() -> None:
     expected = {
         "AllocationContract",
+        "AllocationId",
         "CancellationToken",
         "CheckpointCreated",
         "ContentHash",
@@ -22,10 +23,13 @@ def test_package_exports_all_phase_1_public_names() -> None:
         "MetricsSnapshot",
         "ObjectId",
         "ObjectVersion",
+        "ObservabilityContext",
         "OutputChunk",
         "Progress",
         "ResolvedModelRef",
+        "SecurityContext",
         "Warning",
+        "WorkloadId",
     }
     assert expected <= set(execution.__all__)
     for name in expected:
