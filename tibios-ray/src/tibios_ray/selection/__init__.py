@@ -6,16 +6,21 @@ block). This package depends on ``execution/`` and ``backends/`` only —
 reverse.
 """
 
+from tibios_ray.selection.errors import UnsatisfiablePlanError
 from tibios_ray.selection.policy import (
     ModelSelectionPolicy,
     Quantization,
     ServingConstraints,
     ServingPlan,
 )
+from tibios_ray.selection.preference import ARTIFACT_DEFINED, PreferenceOrderPolicy
 
 __all__ = [
+    "ARTIFACT_DEFINED",
     "ModelSelectionPolicy",
+    "PreferenceOrderPolicy",
     "Quantization",
     "ServingConstraints",
     "ServingPlan",
+    "UnsatisfiablePlanError",
 ]

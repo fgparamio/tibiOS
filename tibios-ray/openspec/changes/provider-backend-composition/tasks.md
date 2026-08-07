@@ -72,16 +72,16 @@ No dependencies. May run in parallel with Slice 2.
 
 No dependencies. May run in parallel with Slice 1.
 
-- [ ] 2.1 Test: `tests/unit/selection/test_preference.py` — `PreferenceOrderPolicy.plan()` deterministic across two identical calls; preference order honoured when multiple ranked backends are available; an unranked `BackendId` present in `available_backends` falls back to the lexicographically smallest `.value`; empty `available_backends` raises `UnsatisfiablePlanError`; the returned `plan.backend` is always a member of `available_backends` (D28; `model-selection-policy` spec: A Concrete ModelSelectionPolicy Implementation Exists — both scenarios, plan() Never Returns a Backend Outside Availability Constraints — both scenarios)
-- [ ] 2.2 Test: quantization sentinel — `plan().quantization == ARTIFACT_DEFINED` for every resolved plan (D23, part 1)
-- [ ] 2.3 Implement: `src/tibios_ray/selection/errors.py` — `UnsatisfiablePlanError` (D21, D28; `selection/` MUST NOT import `capabilities/`)
-- [ ] 2.4 Implement: `src/tibios_ray/selection/preference.py` — `ARTIFACT_DEFINED = Quantization(scheme="artifact-defined", bits=0)` sentinel (D23), `PreferenceOrderPolicy(preference: tuple[BackendId, ...])` (D28)
-- [ ] 2.5 Modify: `src/tibios_ray/selection/__init__.py` — re-export `PreferenceOrderPolicy`, `ARTIFACT_DEFINED`, `UnsatisfiablePlanError` in `__all__`
-- [ ] 2.6 Test: `tests/unit/testing/test_testing_policy.py`, `test_testing_text_backend.py`, `test_testing_embedding_backend.py`, `test_testing_rerank_backend.py` — each fake conforms to its Protocol and its recording/injection knobs behave as documented (following `RecordingBackend`'s existing test pattern)
-- [ ] 2.7 Implement: `src/tibios_ray/testing/policy.py` — a fake/injectable `ModelSelectionPolicy` for Provider tests (returns a caller-supplied plan or raises on demand)
-- [ ] 2.8 Implement: `src/tibios_ray/testing/text_backend.py`, `testing/embedding_backend.py`, `testing/rerank_backend.py` — fakes conforming to `TextGenerationBackend`/embedding/rerank Backend Protocols, following `RecordingBackend`'s shape (records acquired/released sessions; injectable to raise at `acquire`/execute/`release`)
-- [ ] 2.9 Modify: `src/tibios_ray/testing/__init__.py` — register the four new fakes in `__all__` (naming-audit guard in `tests/unit/runtime/test_naming_audit.py` applies — no "Worker"-named identifier)
-- [ ] 2.10 Verify slice 2 green: `uv run pytest tests/unit/selection/ tests/unit/testing/ && uv run ruff check src/tibios_ray/selection/ src/tibios_ray/testing/ && uv run pyright src/tibios_ray/selection/ src/tibios_ray/testing/`
+- [x] 2.1 Test: `tests/unit/selection/test_preference.py` — `PreferenceOrderPolicy.plan()` deterministic across two identical calls; preference order honoured when multiple ranked backends are available; an unranked `BackendId` present in `available_backends` falls back to the lexicographically smallest `.value`; empty `available_backends` raises `UnsatisfiablePlanError`; the returned `plan.backend` is always a member of `available_backends` (D28; `model-selection-policy` spec: A Concrete ModelSelectionPolicy Implementation Exists — both scenarios, plan() Never Returns a Backend Outside Availability Constraints — both scenarios)
+- [x] 2.2 Test: quantization sentinel — `plan().quantization == ARTIFACT_DEFINED` for every resolved plan (D23, part 1)
+- [x] 2.3 Implement: `src/tibios_ray/selection/errors.py` — `UnsatisfiablePlanError` (D21, D28; `selection/` MUST NOT import `capabilities/`)
+- [x] 2.4 Implement: `src/tibios_ray/selection/preference.py` — `ARTIFACT_DEFINED = Quantization(scheme="artifact-defined", bits=0)` sentinel (D23), `PreferenceOrderPolicy(preference: tuple[BackendId, ...])` (D28)
+- [x] 2.5 Modify: `src/tibios_ray/selection/__init__.py` — re-export `PreferenceOrderPolicy`, `ARTIFACT_DEFINED`, `UnsatisfiablePlanError` in `__all__`
+- [x] 2.6 Test: `tests/unit/testing/test_testing_policy.py`, `test_testing_text_backend.py`, `test_testing_embedding_backend.py`, `test_testing_rerank_backend.py` — each fake conforms to its Protocol and its recording/injection knobs behave as documented (following `RecordingBackend`'s existing test pattern)
+- [x] 2.7 Implement: `src/tibios_ray/testing/policy.py` — a fake/injectable `ModelSelectionPolicy` for Provider tests (returns a caller-supplied plan or raises on demand)
+- [x] 2.8 Implement: `src/tibios_ray/testing/text_backend.py`, `testing/embedding_backend.py`, `testing/rerank_backend.py` — fakes conforming to `TextGenerationBackend`/embedding/rerank Backend Protocols, following `RecordingBackend`'s shape (records acquired/released sessions; injectable to raise at `acquire`/execute/`release`)
+- [x] 2.9 Modify: `src/tibios_ray/testing/__init__.py` — register the four new fakes in `__all__` (naming-audit guard in `tests/unit/runtime/test_naming_audit.py` applies — no "Worker"-named identifier)
+- [x] 2.10 Verify slice 2 green: `uv run pytest tests/unit/selection/ tests/unit/testing/ && uv run ruff check src/tibios_ray/selection/ src/tibios_ray/testing/ && uv run pyright src/tibios_ray/selection/ src/tibios_ray/testing/`
 
 ## Slice 3 — Requests + failure taxonomy + dispatch helpers
 
