@@ -19,3 +19,16 @@ def test_package_exports_vllm_backend_public_names() -> None:
     assert expected <= set(engines.__all__)
     for name in expected:
         assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"
+
+
+def test_package_exports_onnxrt_backend_public_names() -> None:
+    expected = {
+        "ONNXRUNTIME_BACKEND_ID",
+        "OnnxEmbeddingBackend",
+        "OnnxRerankBackend",
+        "InferenceSessionLike",
+        "TokenizerLike",
+    }
+    assert expected <= set(engines.__all__)
+    for name in expected:
+        assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"

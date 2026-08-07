@@ -44,8 +44,10 @@ class StubInferenceSession:
         self.providers: tuple[str, ...] = ()
         self.model_path: str = ""
         self.run_calls: list[dict[str, Any]] = []
+        self.get_inputs_calls = 0
 
     def get_inputs(self) -> Sequence[StubNodeArg]:
+        self.get_inputs_calls += 1
         return [StubNodeArg(name) for name in self.input_names]
 
     def run(
