@@ -15,8 +15,14 @@ import pytest
 from google.protobuf import duration_pb2
 
 from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
+from tibios_ray.execution.events import (
+    CheckpointCreated,
+    OutputChunk,
+    Progress,
+    Warning,
+)
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
-from tibios_ray.execution.report import ExecutionPhase, ExecutionReport
+from tibios_ray.execution.report import ExecutionPhase, ExecutionPulse, ExecutionReport
 from tibios_ray.testing.cancellation import ManualCancellation
 from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
@@ -26,6 +32,7 @@ from tibios_ray.transport.errors import (
     EmptyCapabilityError,
     ErrorClass,
     InvalidObjectVersionError,
+    InvalidSequenceError,
     InvalidUlidError,
     MissingFieldError,
     NegativeDurationError,
@@ -732,3 +739,185 @@ class TestExecutionReportToWire:
         result = execution_report_to_wire(report)
 
         assert not hasattr(result, "logs")
+
+
+class TestExecutionPulseToWire:
+    """3b.9 — `execution_pulse_to_wire`'s phase/health-only mapping; D16
+    row: `ExecutionPulse.detail` — "Dropped. Set by nothing, anywhere
+    (verified)"."""
+
+    def test_phase_and_healthy_map_correctly(self) -> None:
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RUNNING, healthy=True)
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert result.phase == worker_pb2.EXECUTION_PHASE_RUNNING
+        assert result.healthy is True
+
+    def test_unhealthy_pulse_maps_healthy_false(self) -> None:
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RECEIVED, healthy=False)
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert result.healthy is False
+
+    def test_wire_pulse_never_carries_detail(self) -> None:
+        """The wire `ExecutionPulse` message structurally has no `detail`
+        field (`__slots__ = ("phase", "healthy")`)."""
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RUNNING, healthy=True, detail="some detail")
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert not hasattr(result, "detail")
+
+    def test_nothing_in_src_constructs_execution_pulse_with_detail_set(self) -> None:
+        """D16 row: "Set by nothing, anywhere (verified)" — a recursive
+        source search confirms no production code constructs an
+        `ExecutionPulse` with `detail` set to a non-None value."""
+        import ast
+        from pathlib import Path
+
+        src_root = Path(__file__).resolve().parents[3] / "src" / "tibios_ray"
+        offenders: list[str] = []
+        for path in src_root.rglob("*.py"):
+            if "_generated" in path.parts:
+                continue
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if name != "ExecutionPulse":
+                    continue
+                for keyword in node.keywords:
+                    if keyword.arg == "detail" and not (
+                        isinstance(keyword.value, ast.Constant) and keyword.value.value is None
+                    ):
+                        offenders.append(str(path))
+
+        assert offenders == []
+
+
+class TestExecutionEventToWireWarning:
+    """3b.7 — D16 row: `Warning.code` — "Dropped... inventing a `[code]
+    msg` parse format on a frozen contract creates an unversioned
+    side-channel"."""
+
+    def test_message_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Warning(message="disk space low", code="LOW_DISK")
+
+        result = execution_event_to_wire(event)
+
+        assert result.warning.message == "disk space low"
+
+    def test_code_is_dropped_and_never_prefixed_into_message(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Warning(message="disk space low", code="LOW_DISK")
+
+        result = execution_event_to_wire(event)
+
+        assert not hasattr(result.warning, "code")
+        assert "LOW_DISK" not in result.warning.message
+        assert result.warning.message == "disk space low"
+
+
+class TestExecutionEventToWireProgress:
+    """3b.10 — D16 row: `Progress.message` — "proto3 has no absent
+    scalar; documented"."""
+
+    def test_message_present_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Progress(fraction_complete=0.25, message="halfway there")
+
+        result = execution_event_to_wire(event)
+
+        assert result.progress.fraction_complete == 0.25
+        assert result.progress.message == "halfway there"
+
+    def test_none_message_maps_to_empty_string(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Progress(fraction_complete=0.5, message=None)
+
+        result = execution_event_to_wire(event)
+
+        assert result.progress.message == ""
+
+
+class TestExecutionEventToWireOutputChunk:
+    """3b.11 — D16 row: `OutputChunk.sequence` — "a Worker bug, surfaced
+    rather than truncated"."""
+
+    def test_well_formed_chunk_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=7)
+
+        result = execution_event_to_wire(event)
+
+        assert result.output_chunk.data == b"hello"
+        assert result.output_chunk.sequence == 7
+
+    def test_negative_sequence_raises_invalid_sequence_error(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=-1)
+
+        with pytest.raises(InvalidSequenceError) as excinfo:
+            execution_event_to_wire(event)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_sequence_at_or_above_2_pow_64_raises_invalid_sequence_error(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=2**64)
+
+        with pytest.raises(InvalidSequenceError) as excinfo:
+            execution_event_to_wire(event)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_max_valid_sequence_converts_successfully_not_truncated(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=2**64 - 1)
+
+        result = execution_event_to_wire(event)
+
+        assert result.output_chunk.sequence == 2**64 - 1
+
+
+class TestExecutionEventToWireCheckpointCreated:
+    """3b.12 — D16 row: `CheckpointCreated.checkpoint_id` — "the owning
+    domain defines validity and the adapter does not second-guess,"
+    mirroring `ContentHash`'s treatment."""
+
+    def test_checkpoint_id_wraps_verbatim_into_checkpoint_object_id(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = CheckpointCreated(checkpoint_id="not-a-ulid-at-all")
+
+        result = execution_event_to_wire(event)
+
+        assert result.checkpoint_created.checkpoint_object_id.value == "not-a-ulid-at-all"
+
+    def test_no_ulid_validation_performed_at_this_boundary(self) -> None:
+        """A well-formed ULID converts too, proving the same code path
+        handles both — no branch performs ULID validation here."""
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = CheckpointCreated(checkpoint_id=_ULID_A)
+
+        result = execution_event_to_wire(event)
+
+        assert result.checkpoint_created.checkpoint_object_id.value == _ULID_A

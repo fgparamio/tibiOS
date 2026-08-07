@@ -25,13 +25,23 @@ from tibios_ray.execution.context import (
     ResolvedModelRef,
     SecurityContext,
 )
+from tibios_ray.execution.events import (
+    CheckpointCreated,
+    EndOfStream,
+    ExecutionEvent,
+    MetricsSnapshot,
+    OutputChunk,
+    Progress,
+    Warning,
+)
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
-from tibios_ray.execution.report import ExecutionPhase, ExecutionReport
+from tibios_ray.execution.report import ExecutionPhase, ExecutionPulse, ExecutionReport
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
 from tibios_ray.transport.errors import (
     EmptyCapabilityError,
     InvalidObjectVersionError,
+    InvalidSequenceError,
     InvalidUlidError,
     MissingFieldError,
     NegativeDurationError,
@@ -341,3 +351,80 @@ def execution_report_to_wire(report: ExecutionReport) -> worker_pb2.ExecutionRep
         trace_id=report.trace_id,
         summary=report.failure if report.failure is not None else "",
     )
+
+
+def execution_pulse_to_wire(pulse: ExecutionPulse) -> worker_pb2.ExecutionPulse:
+    """Domain `ExecutionPulse` -> wire `ExecutionPulse` — `phase`/`healthy`
+    map directly; `detail` is **never** carried onto the wire. The wire
+    `ExecutionPulse` message has no `detail` field at all (D16 row:
+    "Dropped. Set by nothing, anywhere (verified)" — a recursive search
+    of `src/` at design time found zero production constructors of
+    `ExecutionPulse` that set `detail`)."""
+
+    return worker_pb2.ExecutionPulse(
+        phase=phase_to_wire(pulse.phase),
+        healthy=pulse.healthy,
+    )
+
+
+def execution_event_to_wire(event: ExecutionEvent) -> worker_pb2.ExecutionEvent:
+    """Domain `ExecutionEvent` (a PEP 695 tagged union, design decision
+    D7) -> wire `ExecutionEvent` (a oneof `arm`). Each of the six domain
+    event kinds has a direct wire arm — this function is a projection,
+    not a filter, except where D16 (``design.md``) names an explicit
+    drop:
+
+    - `OutputChunk`: `data`/`sequence` map directly; `sequence` outside
+      `[0, 2**64)` raises `InvalidSequenceError` rather than being
+      truncated (D16 row: "a Worker bug, surfaced rather than
+      truncated").
+    - `Progress`: `fraction_complete` maps directly; `message is None`
+      maps to wire `message == ""` (D16 row: "proto3 has no absent
+      scalar; documented").
+    - `Warning`: `message` maps directly; `code` is **never** carried
+      onto the wire and is never prefixed into `message` (D16 row:
+      "Dropped... inventing a `[code] msg` parse format on a frozen
+      contract creates an unversioned side-channel").
+    - `CheckpointCreated`: `checkpoint_id` wraps verbatim into the wire's
+      `ObjectId checkpoint_object_id`, with **no** ULID validation
+      performed at this boundary — the owning domain defines validity,
+      mirroring `content_hash_from_wire`'s inbound treatment (D16 row).
+    - `MetricsSnapshot`: `metrics` maps directly — a trivial pass-through
+      arm with a direct wire home (the relocation target D16 names for
+      `ExecutionReport.resource_usage`/`metrics`, which have no wire home
+      of their own).
+    - `EndOfStream`: carries no data on the wire at all — `reason` is
+      **never** carried (D16 row: "Dropped, and demonstrably non-lossy
+      on the only path that sets it" — `reason` derives from
+      `report.failure`, which reaches wire `summary` via
+      `execution_report_to_wire`'s folding rule).
+    """
+
+    match event:
+        case OutputChunk():
+            if not 0 <= event.sequence <= _U64_MAX:
+                raise InvalidSequenceError("OutputChunk.sequence", event.sequence)
+            return worker_pb2.ExecutionEvent(
+                output_chunk=worker_pb2.OutputChunk(data=event.data, sequence=event.sequence)
+            )
+        case Progress():
+            return worker_pb2.ExecutionEvent(
+                progress=worker_pb2.Progress(
+                    fraction_complete=event.fraction_complete,
+                    message=event.message if event.message is not None else "",
+                )
+            )
+        case Warning():
+            return worker_pb2.ExecutionEvent(warning=worker_pb2.Warning(message=event.message))
+        case CheckpointCreated():
+            return worker_pb2.ExecutionEvent(
+                checkpoint_created=worker_pb2.CheckpointCreated(
+                    checkpoint_object_id=identity_pb2.ObjectId(value=event.checkpoint_id)
+                )
+            )
+        case MetricsSnapshot():
+            return worker_pb2.ExecutionEvent(
+                metrics_snapshot=worker_pb2.MetricsSnapshot(metrics=dict(event.metrics))
+            )
+        case EndOfStream():
+            return worker_pb2.ExecutionEvent(end_of_stream=worker_pb2.EndOfStream())
