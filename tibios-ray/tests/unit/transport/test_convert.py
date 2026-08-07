@@ -18,6 +18,7 @@ from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.events import (
     CheckpointCreated,
     EndOfStream,
+    MetricsSnapshot,
     OutputChunk,
     Progress,
     Warning,
@@ -922,6 +923,33 @@ class TestExecutionEventToWireCheckpointCreated:
         result = execution_event_to_wire(event)
 
         assert result.checkpoint_created.checkpoint_object_id.value == _ULID_A
+
+
+class TestExecutionEventToWireMetricsSnapshot:
+    """`MetricsSnapshot` — a trivial pass-through arm with a direct wire
+    home (the relocation target D16 names for `ExecutionReport.resource_usage`/
+    `metrics`, which have no wire home of their own)."""
+
+    def test_metrics_map_directly_onto_the_wire(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = MetricsSnapshot(metrics={"tokens_per_second": 42.0, "vram_gb": 3.5})
+
+        result = execution_event_to_wire(event)
+
+        assert dict(result.metrics_snapshot.metrics) == {
+            "tokens_per_second": 42.0,
+            "vram_gb": 3.5,
+        }
+
+    def test_empty_metrics_map_converts_to_an_empty_wire_map(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = MetricsSnapshot(metrics={})
+
+        result = execution_event_to_wire(event)
+
+        assert dict(result.metrics_snapshot.metrics) == {}
 
 
 class TestExecutionEventToWireEndOfStream:

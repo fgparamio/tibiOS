@@ -148,6 +148,23 @@ Converting the wire `repeated ResolvedModelRef` MUST produce an ordered domain s
 - WHEN its `dependencies` are inspected
 - THEN each entry is a `ResolvedModelRef` value with no synthesized key, name, or role attached by the conversion itself
 
+### Requirement: Four Domain-To-Wire Fields Transform Rather Than Drop
+
+Distinct from the drop list below, four domain fields reach the wire but
+under a changed shape or default, never silently as-is: `OutputChunk.sequence`
+is range-validated against the wire's unsigned 64-bit representation and
+rejected — never truncated — outside `[0, 2**64)`; `Progress.message`
+folds `None` to wire `""` (proto3 has no absent scalar); `CheckpointCreated.checkpoint_id`
+wraps verbatim into the wire's `ObjectId`, with no ULID validation performed
+at this boundary; and `ExecutionReport.failure` folds into wire `summary`,
+with `failure is None` folding to `summary == ""`.
+
+#### Scenario: The four transforming fields never silently drop or truncate
+
+- GIVEN a domain event or report carrying `OutputChunk.sequence`, `Progress.message`, `CheckpointCreated.checkpoint_id`, or `ExecutionReport.failure`
+- WHEN it is converted to its wire counterpart
+- THEN the value reaches the wire under its documented transform — never dropped, and never silently truncated in the `OutputChunk.sequence` case
+
 ### Requirement: The Domain-To-Wire Drop List Is Closed And Enumerated
 
 Domain fields with no wire counterpart (`ExecutionReport.resource_usage`, `ExecutionReport.metrics`, `ExecutionReport.logs`; `Warning.code`; `EndOfStream.reason`; `ExecutionPulse.detail`) MUST be an explicit, enumerated, tested list. A domain field newly added with no wire home MUST NOT be silently dropped — it MUST be added to this list or given a wire mapping before the conversion is considered complete.

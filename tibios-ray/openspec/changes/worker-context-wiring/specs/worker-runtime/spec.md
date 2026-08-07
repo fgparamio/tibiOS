@@ -24,7 +24,7 @@ cancellation — `worker.proto:212-234`.)
 
 - GIVEN an execution in progress, correlated by its `WorkloadId`
 - WHEN a `Cancel` request for that `WorkloadId` is received (`Cancel(CancelRequest) returns (CancelAck)` — never `Pulse`)
-- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider, emits final Events and a terminal `EndOfStream` on the Channel, and returns the Report per the Worker Contract — the `CancelAck` returned by `Cancel` means only "accepted", never "terminated"; completion is observed solely on the `SubmitJob` response stream
+- THEN the Worker Runtime propagates cancellation to the dispatched Capability Provider, emits final Events and a terminal `EndOfStream` on the Channel, and returns the Report per the Worker Contract — the `CancelAck` returned by `Cancel` means only "accepted", never "terminated"; completion is observed solely on the `SubmitJob` response stream, where the Report remains the final message in every outcome, including cancellation (D14)
 
 #### Scenario: Pulse reports health without affecting execution state
 
