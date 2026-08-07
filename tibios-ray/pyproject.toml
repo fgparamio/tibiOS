@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "grpcio>=1.83.0",
+    "protobuf>=7.35.1",
     "ray>=2.56.1",
 ]
 
@@ -20,6 +22,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "grpcio-tools>=1.83.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "ruff>=0.16.1",
@@ -28,12 +31,14 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py314"
+extend-exclude = ["src/tibios_ray/transport/_generated"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
 [tool.pyright]
 include = ["src", "tests"]
+exclude = ["src/tibios_ray/transport/_generated"]
 typeCheckingMode = "standard"
 pythonVersion = "3.14"
 reportUnnecessaryTypeIgnoreComment = true
