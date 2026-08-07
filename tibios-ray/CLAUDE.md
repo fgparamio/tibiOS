@@ -19,4 +19,4 @@ The gRPC/proto contract between `tibios-core` and `tibios-ray` lives in `../prot
 
 ## Conventions
 
-No project-specific conventions yet — this is a fresh skeleton (`uv`, Python ≥3.13, `ray` dependency). Global CLAUDE.md policy applies: conventional commits, no AI attribution.
+No project-specific conventions yet — this is a fresh skeleton (`uv`, Python ≥3.14, `ray` dependency). Global CLAUDE.md policy applies: conventional commits, no AI attribution.
