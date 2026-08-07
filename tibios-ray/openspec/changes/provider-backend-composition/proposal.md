@@ -113,7 +113,7 @@ Purely additive except three Provider constructors and `worker.py`. Reverting th
 
 ## Delivery
 
-Estimated **~1000–1300 hand-written lines** — over the 400-line review budget, so **chained PRs are expected**. Revised upward from an earlier ~600-900 estimate, which omitted the `engines/llamacpp.py` pool work ADR-0003 requires (see the Affected Areas correction above). Natural slices: (1) config surface; (2) concrete `ModelSelectionPolicy` + test doubles; (3) `ChatProvider` wiring (the streaming case, hardest first); (4) `EmbeddingProvider` + `RerankProvider` (the batch cases); (5) `engines/llamacpp.py` pool (independent, may land in parallel); (6) Composition Root + conformance-test split. `sdd-tasks` owns the final split and MUST emit the Review Workload Forecast.
+Estimated **~1000–1300 hand-written lines** — over the 400-line review budget, so **chained PRs are expected**. Revised upward from an earlier ~600-900 estimate, which omitted the `engines/llamacpp.py` pool work ADR-0003 requires (see the Affected Areas correction above). Slices, matching `design.md`'s authoritative Slice Plan/File Changes table: (1) config surface; (2) concrete `ModelSelectionPolicy` + test doubles; (3) `capabilities/requests.py` + failure taxonomy + `capabilities/dispatch.py`; (4) `ChatProvider` wiring (the streaming case, hardest first); (5) `EmbeddingProvider` + `RerankProvider` (the batch cases); (6) `engines/llamacpp.py` pool (depends only on slice 1, may land in parallel with 2-5); (7) Composition Root + conformance-test split (gates on all six). `sdd-tasks` owns the final split and MUST emit the Review Workload Forecast.
 
 ## Dependencies
 
