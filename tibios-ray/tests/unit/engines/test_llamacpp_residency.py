@@ -1,10 +1,16 @@
-"""`llamacpp-text-backend` spec, Requirement "Residency Lifecycle
-Constructs and Frees One Model Per Session" — `acquire()` constructs
-exactly one `Llama` per call (design decision LC3, side table LC2);
-`release()` frees it and makes the session unusable.
+"""`llamacpp-text-backend` spec, Requirement "Residency Is Backend-Owned,
+Not Request-Owned" (design decisions D26/D27) — `acquire()` checks an
+already-warm instance out of the pool (never constructs one);
+`release()` returns it for reuse and pops the session from the side
+table, making that `BackendSession` handle unusable again.
+
+Pool-level behavior (eager construction, exhaustion, no-close-on-release)
+is covered end to end in `test_llamacpp_pool.py`; this module covers the
+per-session handle bookkeeping layered on top of the pool (LC2).
 """
 
 import asyncio
+from pathlib import Path
 
 import pytest
 from stub_llama import StubLlama
@@ -21,7 +27,15 @@ class _Plan:
 _PLAN = _Plan(BackendId("llama_cpp"))
 
 
-def _backend_with_stubs() -> tuple[LlamaCppTextBackend, list[StubLlama]]:
+def _gguf_path(tmp_path: Path) -> str:
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"not a real gguf, just needs to exist and be readable")
+    return str(path)
+
+
+def _backend_with_stubs(
+    tmp_path: Path, *, pool_size: int = 1
+) -> tuple[LlamaCppTextBackend, list[StubLlama]]:
     made: list[StubLlama] = []
 
     def factory(model_path: str) -> StubLlama:
@@ -29,11 +43,19 @@ def _backend_with_stubs() -> tuple[LlamaCppTextBackend, list[StubLlama]]:
         made.append(stub)
         return stub
 
-    return LlamaCppTextBackend(model_path="model.gguf", factory=factory), made
+    backend = LlamaCppTextBackend(
+        model_path=_gguf_path(tmp_path), factory=factory, pool_size=pool_size
+    )
+    return backend, made
 
 
-def test_two_acquires_give_distinct_session_ids_and_distinct_stub_instances() -> None:
-    backend, made = _backend_with_stubs()
+def test_two_acquires_give_distinct_session_ids_and_distinct_pool_instances(
+    tmp_path: Path,
+) -> None:
+    # pool_size=2: two pre-warmed instances exist before either acquire()
+    # runs (D26/D27) — the factory is never called again by acquire()
+    # itself, so `made` stays at exactly 2 throughout.
+    backend, made = _backend_with_stubs(tmp_path, pool_size=2)
 
     async def scenario() -> tuple[str, str]:
         first = await backend.acquire(_PLAN)
@@ -47,8 +69,10 @@ def test_two_acquires_give_distinct_session_ids_and_distinct_stub_instances() ->
     assert made[0] is not made[1]
 
 
-def test_acquire_returns_a_session_bound_to_the_llama_cpp_backend_id() -> None:
-    backend, _ = _backend_with_stubs()
+def test_acquire_returns_a_session_bound_to_the_llama_cpp_backend_id(
+    tmp_path: Path,
+) -> None:
+    backend, _ = _backend_with_stubs(tmp_path)
 
     async def scenario() -> BackendId:
         session = await backend.acquire(_PLAN)
@@ -57,26 +81,33 @@ def test_acquire_returns_a_session_bound_to_the_llama_cpp_backend_id() -> None:
     assert asyncio.run(scenario()) == BackendId("llama_cpp")
 
 
-def test_release_calls_close_exactly_once_and_the_session_becomes_unusable() -> None:
-    backend, made = _backend_with_stubs()
+def test_release_never_closes_and_the_session_handle_becomes_unusable(
+    tmp_path: Path,
+) -> None:
+    backend, made = _backend_with_stubs(tmp_path)
 
     async def scenario() -> None:
         session = await backend.acquire(_PLAN)
         await backend.release(session)
-        assert made[0].close_calls == 1
+        # D26: the instance is returned to the pool for reuse, never
+        # closed — instances are process-scoped (ADR-0001).
+        assert made[0].close_calls == 0
 
-        # The session is no longer usable: releasing it again fails the
-        # same way an always-unknown session would (it has been popped
-        # from the residency side table, design decision LC2).
+        # The *session handle* is no longer usable: releasing it again
+        # fails the same way an always-unknown session would (it has
+        # been popped from the residency side table, design decision
+        # LC2) — this is independent of whether the underlying `Llama`
+        # instance itself is still alive in the pool.
         with pytest.raises(Exception):
             await backend.release(session)
 
     asyncio.run(scenario())
 
 
-def test_releasing_an_unknown_session_raises() -> None:
-    backend, _ = _backend_with_stubs()
-    foreign_session = asyncio.run(_backend_with_stubs()[0].acquire(_PLAN))
+def test_releasing_an_unknown_session_raises(tmp_path: Path) -> None:
+    backend, _ = _backend_with_stubs(tmp_path)
+    other_backend, _ = _backend_with_stubs(tmp_path)
+    foreign_session = asyncio.run(other_backend.acquire(_PLAN))
 
     async def scenario() -> None:
         with pytest.raises(Exception):

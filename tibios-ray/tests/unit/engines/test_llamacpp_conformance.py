@@ -10,20 +10,29 @@ harness in `tests/unit/backends/test_protocol_conformance.py` (CP7
 precedent).
 """
 
+from pathlib import Path
+
+from stub_llama import StubLlama
+
 from tibios_ray.backends.text import TextGenerationBackend
-from tibios_ray.engines.llamacpp import LlamaCppTextBackend, LlamaLike
+from tibios_ray.engines.llamacpp import LlamaCppTextBackend
 
 
-def _never_called_factory(model_path: str) -> LlamaLike:
-    raise AssertionError("factory must not be invoked for a typed binding")
+def _gguf_path(tmp_path: Path) -> str:
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"not a real gguf, just needs to exist and be readable")
+    return str(path)
 
 
-def test_llamacpp_text_backend_satisfies_text_generation_backend() -> None:
+def test_llamacpp_text_backend_satisfies_text_generation_backend(tmp_path: Path) -> None:
     # The assignment itself is the conformance proof: pyright rejects
     # this line if `LlamaCppTextBackend` does not structurally satisfy
-    # `TextGenerationBackend` (no base class, `uv run pyright`).
+    # `TextGenerationBackend` (no base class, `uv run pyright`). Slice 6
+    # (D26/D27): the pool is built eagerly, so the factory does run
+    # once here (pool_size=1) — a real, readable `model_path` is
+    # required for construction to succeed at all.
     backend: TextGenerationBackend = LlamaCppTextBackend(
-        model_path="model.gguf", factory=_never_called_factory
+        model_path=_gguf_path(tmp_path), factory=lambda path: StubLlama()
     )
     assert backend.backend_id.value == "llama_cpp"
 

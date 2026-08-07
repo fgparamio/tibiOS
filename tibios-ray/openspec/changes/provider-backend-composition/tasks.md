@@ -133,14 +133,14 @@ Depends on Slice 4 (reuses the same conformance-split pattern and `dispatch.py`/
 
 May land as a parallel PR alongside slices 2-5, not chained after them.
 
-- [ ] 6.1 Test: `tests/unit/engines/test_llamacpp_pool.py` — pool size N → the `Llama` factory is called exactly N times at construction and never again across M > N subsequent `acquire()` calls (D26/D27; success criterion "constructed once at startup and never per-request")
-- [ ] 6.2 Test: extend `test_llamacpp_pool.py` — N+1 concurrent `acquire()`s with only N instances available → the (N+1)th waits, then succeeds once one instance is `release()`d
-- [ ] 6.3 Test: extend `test_llamacpp_pool.py` — none released before `TIBIOS_RAY_LLAMACPP_ACQUIRE_TIMEOUT_SECONDS` elapses → `PoolExhaustedError` raised and `release()` never called (no session existed) (D26)
-- [ ] 6.4 Test: extend `test_llamacpp_pool.py` — `release()` returns the instance to the pool without calling `close()` on it (D26 — instances are process-scoped, ADR-0001)
-- [ ] 6.5 Test: extend `test_llamacpp_pool.py` — `pool_size=0` raises before any factory call; a missing/unreadable `model_path` raises before the factory is called (D27 pre-checks)
-- [ ] 6.6 Test: extend `test_llamacpp_pool.py` — factory raising on the 2nd of 3 eager constructions → construction raises and propagates out of `build_runtime()` (used later by Slice 7's boot-failure assertion, defined here since it's this module's contract) (D27)
-- [ ] 6.7 Implement: `src/tibios_ray/engines/llamacpp.py` — `PoolExhaustedError`; replace per-call `Llama` construction with an `asyncio.Queue`-backed pool of N pre-warmed instances built eagerly in `__init__`; `acquire()` = `await queue.get()` under `asyncio.timeout(acquire_timeout)`; `release()` = join the pump thread off-loop then `put_nowait`; keep `_Residency.lock`; two pre-checks (`pool_size >= 1`, `model_path` exists and is readable) before eager construction (D26/D27)
-- [ ] 6.8 Verify slice 6 green: `uv run pytest tests/unit/engines/ && uv run ruff check src/tibios_ray/engines/llamacpp.py && uv run pyright src/tibios_ray/engines/llamacpp.py`
+- [x] 6.1 Test: `tests/unit/engines/test_llamacpp_pool.py` — pool size N → the `Llama` factory is called exactly N times at construction and never again across M > N subsequent `acquire()` calls (D26/D27; success criterion "constructed once at startup and never per-request")
+- [x] 6.2 Test: extend `test_llamacpp_pool.py` — N+1 concurrent `acquire()`s with only N instances available → the (N+1)th waits, then succeeds once one instance is `release()`d
+- [x] 6.3 Test: extend `test_llamacpp_pool.py` — none released before `TIBIOS_RAY_LLAMACPP_ACQUIRE_TIMEOUT_SECONDS` elapses → `PoolExhaustedError` raised and `release()` never called (no session existed) (D26)
+- [x] 6.4 Test: extend `test_llamacpp_pool.py` — `release()` returns the instance to the pool without calling `close()` on it (D26 — instances are process-scoped, ADR-0001)
+- [x] 6.5 Test: extend `test_llamacpp_pool.py` — `pool_size=0` raises before any factory call; a missing/unreadable `model_path` raises before the factory is called (D27 pre-checks)
+- [x] 6.6 Test: extend `test_llamacpp_pool.py` — factory raising on the 2nd of 3 eager constructions → construction raises and propagates out of `build_runtime()` (used later by Slice 7's boot-failure assertion, defined here since it's this module's contract) (D27)
+- [x] 6.7 Implement: `src/tibios_ray/engines/llamacpp.py` — `PoolExhaustedError`; replace per-call `Llama` construction with an `asyncio.Queue`-backed pool of N pre-warmed instances built eagerly in `__init__`; `acquire()` = `await queue.get()` under `asyncio.timeout(acquire_timeout)`; `release()` = join the pump thread off-loop then `put_nowait`; keep `_Residency.lock`; two pre-checks (`pool_size >= 1`, `model_path` exists and is readable) before eager construction (D26/D27)
+- [x] 6.8 Verify slice 6 green: `uv run pytest tests/unit/engines/ && uv run ruff check src/tibios_ray/engines/llamacpp.py && uv run pyright src/tibios_ray/engines/llamacpp.py`
 
 ## Slice 7 — Composition Root
 

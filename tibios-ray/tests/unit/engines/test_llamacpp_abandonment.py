@@ -16,6 +16,7 @@ as opposed to a coincidence of the stream finishing on its own.
 
 import asyncio
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import cast
 
 from stub_llama import StubLlama
@@ -40,9 +41,15 @@ _PLAN = _Plan(BackendId("llama_cpp"))
 _MANY_TOKENS = tuple(f"t{i}" for i in range(30))
 
 
-def test_abandon_releases_lock() -> None:
+def _gguf_path(tmp_path: Path) -> str:
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"not a real gguf, just needs to exist and be readable")
+    return str(path)
+
+
+def test_abandon_releases_lock(tmp_path: Path) -> None:
     stub = StubLlama(tokens=_MANY_TOKENS)
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> tuple[TextChunk, bool, list[TextChunk]]:
         session = await backend.acquire(_PLAN)
