@@ -43,9 +43,11 @@ use runtime_primitives::WorkloadId;
 ///     fn execute<C: ExecutionChannel>(&self, context: ExecutionContext, channel: C)
 ///         -> impl Future<Output = Result<ExecutionReport, WorkerError>> + Send
 ///     {
+///         // The `match` runs here, synchronously, in this method's own
+///         // body — never deferred into an `async move { match .. }` block.
 ///         match self {
-///             Self::Local(worker) => Either::Left(worker.execute(context, channel)),
-///             Self::Ray(worker) => Either::Right(worker.execute(context, channel)),
+///             Self::Local(worker) => Box::pin(worker.execute(context, channel)),
+///             Self::Ray(worker) => Box::pin(worker.execute(context, channel)),
 ///         }
 ///     }
 ///     // `cancel` and `pulse` follow the same shape.
@@ -56,11 +58,26 @@ use runtime_primitives::WorkloadId;
 /// implementation's own method, exactly as any hand-written enum dispatch
 /// does; nothing in `runtime-worker` changes to support this — the pattern
 /// lives entirely in `runtime` (the Composition Root), where `AnyWorker` is
-/// defined. If a boxing/type-erasure wrapper (a hand-written `Box<dyn ..>`
-/// adapter around a monomorphized `execute` call for one fixed `C`) is ever
-/// needed instead, it also belongs in the Composition Root, not here — the
-/// port states what the contract requires, not how a caller chooses to
-/// erase it (design.md D9 Consequences).
+/// defined. `Box::pin` unifies the two branches' otherwise-distinct
+/// anonymous future types; an `Either`-style wrapper would need unsafe Pin
+/// projection to avoid that allocation, which the workspace denies
+/// (`unsafe_code = "deny"`), so `AnyWorker` pays one allocation per call
+/// instead (design.md D10).
+///
+/// # Hazard: a lazily-evaluated wrapper silently breaks O1
+///
+/// The `match` above MUST run eagerly, in `execute`'s own body, not inside
+/// the future it returns. A version that instead defers dispatch —
+/// `async move { match self { .. => worker.execute(context, channel).await, .. } }`
+/// — looks equivalent but is not: nothing calls the concrete Worker's own
+/// `execute` method until the outer future is first polled, so O1
+/// registration (which happens inside that inner `execute` call, not inside
+/// the future it returns) is delayed past `AnyWorker::execute`'s own return.
+/// A `cancel` issued between that return and the first poll then wrongly
+/// observes an unregistered workload. This is exactly why `runtime`'s
+/// `AnyWorker` carries a dedicated regression test proving the eager
+/// version's behavior directly, not just its own O1 conformance-suite
+/// coverage (`runtime-composition-root/spec.md`; design.md D10).
 ///
 /// # `'static`
 ///

@@ -34,7 +34,7 @@ Forbidden: `std::fs::read(...)` → prefer `tokio::fs::read(...)`.
 
 Move heavy computation away from async executors. Use `tokio::task::spawn_blocking(...)` only when necessary; long term, prefer dedicated worker pools.
 
-> This is a hard requirement for the `local-infer` crate: llama.cpp inference is CPU-bound and must never run directly on a Tokio task. It runs on a dedicated blocking thread pool; the crate's own API is async at the boundary, but never blocks the executor internally.
+> This is a hard requirement for `local-infer`: llama.cpp inference is CPU-bound and must never run directly on a Tokio task. It runs on a dedicated blocking thread pool. The Runtime-facing boundary is asynchronous. Internal implementations may be synchronous provided they never block the Runtime executor.
 
 ## Ownership
 

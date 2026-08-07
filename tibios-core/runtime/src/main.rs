@@ -10,12 +10,14 @@
 //! This binding wires one real, end-to-end execution
 //! (`runtime-composition-root/spec.md` — "Runtime Wires One Real Execution
 //! End-To-End"): a concrete `ExecutionChannel`, a `WorkerService`
-//! implementation obtained exclusively through the `worker::in_process_worker`
+//! implementation obtained exclusively through the `worker::any_worker`
 //! factory (only its `impl WorkerService` return type crosses into this
-//! file — no concrete worker or transport type is ever named here), one
-//! submitted execution, its drained events, and the terminal
-//! `ExecutionReport`. Hand-wiring `runtime-allocation`, `runtime-object`, or
-//! `runtime-scheduler` stays out of scope for this change.
+//! file — no concrete worker or transport type is ever named here; nor is
+//! any engine type, since `any_worker` alone selects between them via
+//! `WorkerKind`), one submitted execution, its drained events, and the
+//! terminal `ExecutionReport`. Hand-wiring `runtime-allocation`,
+//! `runtime-object`, or `runtime-scheduler` stays out of scope for this
+//! change.
 
 mod worker;
 
@@ -29,7 +31,7 @@ use runtime_worker::{
     WorkerService,
 };
 use tokio::sync::mpsc;
-use worker::MpscExecutionChannel;
+use worker::{MpscExecutionChannel, WorkerKind};
 
 /// The bounded `mpsc` channel's capacity (design.md D8: "9 events against a
 /// capacity-4 channel ⇒ `emit` genuinely blocks on the receiver, so the
@@ -70,7 +72,7 @@ fn demo_context() -> ExecutionContext {
 async fn main() {
     let (sender, mut receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let channel = MpscExecutionChannel::new(sender); // the ONLY Sender, moved in
-    let worker = worker::in_process_worker();
+    let worker = worker::any_worker(WorkerKind::LocalInfer);
 
     let drain = tokio::spawn(async move {
         let mut seen = 0usize;

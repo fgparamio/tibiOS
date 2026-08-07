@@ -234,51 +234,24 @@ mod tests {
     use std::time::Duration;
 
     use runtime_allocation::AllocationContract;
-    use runtime_primitives::{AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId};
+    use runtime_primitives::WorkloadId;
     use runtime_worker::{
-        CancelAck, EndOfStream, ExecutionContext, ExecutionEvent, ExecutionPhase,
-        ObservabilityContext, OutputChunk, Progress, ResolvedDependency, SecurityContext,
-        WorkerCapability, WorkerError, WorkerService,
+        CancelAck, EndOfStream, ExecutionEvent, ExecutionPhase, OutputChunk, Progress, WorkerError,
+        WorkerService,
     };
-    use tokio::sync::mpsc;
 
-    use super::super::channel::MpscExecutionChannel;
+    use super::super::conformance::{
+        context_with, generous_channel, sample_context, worker_conformance_suite,
+    };
     use super::InProcessWorker;
 
-    fn context_with(
-        workload_id: WorkloadId,
-        allocation_contract: AllocationContract,
-        execution_parameters: BTreeMap<String, String>,
-    ) -> ExecutionContext {
-        let dependency = ResolvedDependency::new(
-            ObjectId::new(),
-            ObjectVersion::initial(),
-            ContentHash::new("sha256:af23"),
-        );
-        ExecutionContext::new(
-            workload_id,
-            AllocationId::new(),
-            allocation_contract,
-            vec![dependency],
-            SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
-            ObservabilityContext::new("trace-1", "span-1"),
-            execution_parameters,
-            WorkerCapability::new("chat.generate"),
-        )
-    }
-
-    fn sample_context(workload_id: WorkloadId) -> ExecutionContext {
-        context_with(
-            workload_id,
-            AllocationContract::new(Duration::from_secs(30)),
-            BTreeMap::new(),
-        )
-    }
-
-    fn generous_channel() -> (MpscExecutionChannel, mpsc::Receiver<ExecutionEvent>) {
-        let (sender, receiver) = mpsc::channel(32);
-        (MpscExecutionChannel::new(sender), receiver)
-    }
+    // `worker-inprocess-adapter/spec.md` — "The in-process worker's existing
+    // test suite MUST NOT be deleted: it stays in place as supplementary
+    // coverage ... even where a given test's obligation-level assertion now
+    // overlaps with something the harness also checks." All eight tests
+    // below stay exactly as they were; only their shared fixtures moved to
+    // `conformance.rs` (task 3.1). The harness invocation below is additive.
+    worker_conformance_suite!(InProcessWorker::new());
 
     #[tokio::test]
     async fn cancel_immediately_after_execute_is_called_succeeds() {

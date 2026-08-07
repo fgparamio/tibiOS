@@ -450,6 +450,30 @@ fn rust_files_excluding_adapters(dir: &std::path::Path) -> Vec<std::path::PathBu
     found
 }
 
+/// Recursively collect every `.rs` file under `dir`, with no subdirectory
+/// exclusion — the plain counterpart to `rust_files_excluding_adapters`,
+/// used by scans that need every file in a subtree (design
+/// `worker-local-infer-adapter/design.md` D12).
+fn rust_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    collect_rust_files(dir, &mut found);
+    found
+}
+
+fn collect_rust_files(dir: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+    let entries = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+    for entry in entries {
+        let entry = entry.expect("directory entry should be readable");
+        let path = entry.path();
+        if path.is_dir() {
+            collect_rust_files(&path, found);
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            found.push(path);
+        }
+    }
+}
+
 fn collect_rust_files_excluding_adapters(
     dir: &std::path::Path,
     found: &mut Vec<std::path::PathBuf>,
@@ -677,5 +701,123 @@ fn runtime_worker_doc_comment_cites_the_owning_document() {
         contents.contains("18-worker-model.md"),
         "expected the crate doc comment in {} to cite `18-worker-model.md`",
         lib_rs.display()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Local-Infer engine containment scans (`worker-local-infer-adapter/design.md`
+// D12): D0-b means the engine subtree earns no new `EXTERNAL_ALLOWED` row of
+// its own (`runtime` already carries `tokio`), so these source-containment
+// scans are the machine-checked stand-in for that row — the direct
+// enforcement of `worker-local-infer-adapter/spec.md`'s "The Engine Port Is
+// Wholly Synchronous, Std-Only..." requirement.
+// ---------------------------------------------------------------------------
+
+/// The Local-Infer engine subtree, relative to the workspace root — must
+/// never name `tokio`, `async`, or `await` anywhere in it (design D12).
+const LOCAL_INFER_ENGINE_SRC: &str = "runtime/src/worker/local_infer/engine";
+
+/// Scans exactly `files` for any of `identifiers`, skipping comment lines
+/// and matching whole identifiers only (`contains_identifier`) — the same
+/// convention the transport-token scan above uses. Returns one violation
+/// message per offending line. Extracted from `find_identifier_occurrences`
+/// (task 3.10) so a caller can hand-assemble a file list — e.g. a subtree
+/// scan that itself excludes a nested subdirectory — instead of being
+/// limited to "every file under one directory."
+fn find_identifier_occurrences_in_files(
+    files: &[std::path::PathBuf],
+    identifiers: &[&str],
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for file in files {
+        let contents = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", file.display()));
+        for (line_number, line) in contents.lines().enumerate() {
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
+            for identifier in identifiers {
+                if contains_identifier(line, identifier) {
+                    violations.push(format!(
+                        "{}:{}: contains forbidden identifier `{identifier}`",
+                        file.display(),
+                        line_number + 1
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
+/// Scans every `.rs` file under `dir` (via `rust_files`, no subdirectory
+/// exclusion) for any of `identifiers` — thin wrapper over
+/// `find_identifier_occurrences_in_files`.
+fn find_identifier_occurrences(dir: &std::path::Path, identifiers: &[&str]) -> Vec<String> {
+    find_identifier_occurrences_in_files(&rust_files(dir), identifiers)
+}
+
+/// Spec scenario "A whole-subtree token scan finds no tokio:: path and no
+/// async/await keyword" (`worker-local-infer-adapter/spec.md`): no `tokio`
+/// identifier anywhere under `local_infer/engine/`. Written before any
+/// violation was ever possible — the engine subtree is `std`-only by
+/// construction (Phase 1.1/1.2) — so this test proves the invariant is
+/// mechanically enforced going forward, not merely true by accident today.
+#[test]
+fn local_infer_engine_names_no_async_runtime() {
+    let engine_src = workspace_root().join(LOCAL_INFER_ENGINE_SRC);
+    let violations = find_identifier_occurrences(&engine_src, &["tokio"]);
+
+    assert!(
+        violations.is_empty(),
+        "the local-infer engine subtree must never name `tokio`:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// Spec scenario "A whole-subtree token scan finds no tokio:: path and no
+/// async/await keyword" (`worker-local-infer-adapter/spec.md`): no `async`
+/// or `await` identifier anywhere under `local_infer/engine/` — the
+/// machine-checked stand-in for design D5's amended canon wording ("Internal
+/// implementations may be synchronous").
+#[test]
+fn local_infer_engine_declares_no_async_surface() {
+    let engine_src = workspace_root().join(LOCAL_INFER_ENGINE_SRC);
+    let violations = find_identifier_occurrences(&engine_src, &["async", "await"]);
+
+    assert!(
+        violations.is_empty(),
+        "the local-infer engine subtree must declare no async surface (no `async`/`await`):\n{}",
+        violations.join("\n")
+    );
+}
+
+/// Spec scenario "No engine-specific name appears outside the engine module,
+/// including in local_infer/mod.rs" (`worker-local-infer-adapter/spec.md`):
+/// `llama`, `llama_cpp`, `ggml`, `candle` must never appear anywhere in
+/// `crates/runtime-worker/src/` or `runtime/src/`, excluding the engine
+/// subtree itself (`LOCAL_INFER_ENGINE_SRC`) — the one place a real
+/// inference backend's name is expected to eventually appear (design D12).
+/// Reuses `rust_files` (task 1.8) and `find_identifier_occurrences_in_files`
+/// (task 3.10) rather than adding a third file-walk helper.
+#[test]
+fn engine_names_stay_inside_the_engine_module() {
+    let root = workspace_root();
+    let engine_src = root.join(LOCAL_INFER_ENGINE_SRC);
+
+    let mut files = rust_files(&root.join("crates/runtime-worker/src"));
+    files.extend(
+        rust_files(&root.join("runtime/src"))
+            .into_iter()
+            .filter(|path| !path.starts_with(&engine_src)),
+    );
+
+    let violations =
+        find_identifier_occurrences_in_files(&files, &["llama", "llama_cpp", "ggml", "candle"]);
+
+    assert!(
+        violations.is_empty(),
+        "engine-specific names must stay inside `local_infer/engine/`:\n{}",
+        violations.join("\n")
     );
 }
