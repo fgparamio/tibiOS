@@ -8,3 +8,7 @@ Requirement "Generated Code Is Isolated To The Transport Package";
 errors, cancellation, the servicer — lands in later slices (S3/S4a/S4b)
 and is re-exported here as it arrives.
 """
+
+from tibios_ray.transport.server import serve
+
+__all__ = ["serve"]
