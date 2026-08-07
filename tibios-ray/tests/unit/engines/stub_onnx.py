@@ -16,6 +16,7 @@ and shape tests — plain nested lists, never numpy, doubling as proof
 that OR9's extraction is duck-typed (design.md "Testing Strategy").
 """
 
+import threading
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -38,6 +39,9 @@ class StubInferenceSession:
         *,
         input_names: Sequence[str] = (),
         outputs: Sequence[Any] = (),
+        run_barrier: threading.Barrier | None = None,
+        run_entered: threading.Event | None = None,
+        run_block: threading.Event | None = None,
     ) -> None:
         self.input_names = tuple(input_names)
         self.outputs = outputs
@@ -45,6 +49,17 @@ class StubInferenceSession:
         self.model_path: str = ""
         self.run_calls: list[dict[str, Any]] = []
         self.get_inputs_calls = 0
+        # PR 2 (`_infer`'s concurrency/off-loop proofs, OR3/OR7):
+        # `run_barrier` proves two concurrent `run()` calls on the SAME
+        # shared session both entered before either returned — a lock
+        # anywhere on the path deadlocks the barrier until its timeout.
+        # `run_entered`/`run_block` prove `run()` genuinely blocks a
+        # worker thread while the event loop keeps making progress
+        # (OR7) and that cancellation leaves it orphaned but harmless
+        # (OR11).
+        self.run_barrier = run_barrier
+        self.run_entered = run_entered
+        self.run_block = run_block
 
     def get_inputs(self) -> Sequence[StubNodeArg]:
         self.get_inputs_calls += 1
@@ -54,6 +69,12 @@ class StubInferenceSession:
         self, output_names: Sequence[str] | None, input_feed: Mapping[str, Any]
     ) -> Sequence[Any]:
         self.run_calls.append({"output_names": output_names, "input_feed": input_feed})
+        if self.run_entered is not None:
+            self.run_entered.set()
+        if self.run_barrier is not None:
+            self.run_barrier.wait(timeout=5.0)
+        if self.run_block is not None:
+            self.run_block.wait(timeout=5.0)
         return self.outputs
 
 
