@@ -15,7 +15,15 @@ import pytest
 from google.protobuf import duration_pb2
 
 from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
+from tibios_ray.execution.events import (
+    CheckpointCreated,
+    EndOfStream,
+    OutputChunk,
+    Progress,
+    Warning,
+)
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
+from tibios_ray.execution.report import ExecutionPhase, ExecutionPulse, ExecutionReport
 from tibios_ray.testing.cancellation import ManualCancellation
 from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
@@ -25,6 +33,7 @@ from tibios_ray.transport.errors import (
     EmptyCapabilityError,
     ErrorClass,
     InvalidObjectVersionError,
+    InvalidSequenceError,
     InvalidUlidError,
     MissingFieldError,
     NegativeDurationError,
@@ -583,3 +592,404 @@ class TestNoConversionPathPanics:
             )
         else:
             pytest.fail("expected conversion to raise ConversionError, but it succeeded")
+
+
+# --- S3b — Outbound Conversion (Event/Report/Pulse) + D16 Lossiness ---
+
+
+class TestPhaseToWire:
+    """3b.1 — `worker-wire-conversion`: "Every domain phase maps to a
+    defined wire phase"."""
+
+    @pytest.mark.parametrize(
+        ("phase", "expected"),
+        [
+            (ExecutionPhase.RECEIVED, worker_pb2.EXECUTION_PHASE_RECEIVED),
+            (ExecutionPhase.PREPARED, worker_pb2.EXECUTION_PHASE_PREPARED),
+            (ExecutionPhase.RUNNING, worker_pb2.EXECUTION_PHASE_RUNNING),
+            (ExecutionPhase.COMPLETED, worker_pb2.EXECUTION_PHASE_COMPLETED),
+            (ExecutionPhase.FAILED, worker_pb2.EXECUTION_PHASE_FAILED),
+            (ExecutionPhase.CANCELLED, worker_pb2.EXECUTION_PHASE_CANCELLED),
+        ],
+    )
+    def test_every_domain_phase_maps_to_a_defined_wire_phase(
+        self, phase: ExecutionPhase, expected: int
+    ) -> None:
+        from tibios_ray.transport.convert import phase_to_wire
+
+        result = phase_to_wire(phase)
+
+        assert result == expected
+        assert result != worker_pb2.EXECUTION_PHASE_UNSPECIFIED
+
+    def test_phase_to_wire_key_set_equals_every_domain_phase(self) -> None:
+        from tibios_ray.transport.convert import _PHASE_TO_WIRE
+
+        assert set(_PHASE_TO_WIRE) == set(ExecutionPhase)
+
+
+class TestDurationToWire:
+    """3b.2 — outbound direction of D9's negative-`Duration` rejection
+    (D9 Consequences — "Same treatment for `ExecutionReport.duration`
+    outbound")."""
+
+    def test_positive_timedelta_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import duration_to_wire
+
+        result = duration_to_wire(timedelta(seconds=5), field="test")
+
+        assert result.ToTimedelta() == timedelta(seconds=5)
+
+    def test_negative_timedelta_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import duration_to_wire
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            duration_to_wire(timedelta(seconds=-1), field="ExecutionReport.duration")
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+        assert "ExecutionReport.duration" in str(excinfo.value)
+
+
+def _report(**overrides: object) -> ExecutionReport:
+    defaults: dict[str, object] = {
+        "phase": ExecutionPhase.COMPLETED,
+        "duration": timedelta(seconds=2),
+        "resource_usage": {"cpu_seconds": 1.5},
+        "metrics": {"tokens": 42.0},
+        "trace_id": "trace-1",
+        "logs": ("line one", "line two"),
+        "failure": None,
+    }
+    defaults.update(overrides)
+    return ExecutionReport(**defaults)  # type: ignore[arg-type]
+
+
+class TestExecutionReportToWire:
+    """3b.2-3b.6 — `execution_report_to_wire`'s outbound fields plus D16's
+    closed lossiness list for `ExecutionReport`."""
+
+    def test_negative_duration_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(duration=timedelta(seconds=-1))
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            execution_report_to_wire(report)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_trace_id_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(trace_id="trace-verbatim")
+
+        result = execution_report_to_wire(report)
+
+        assert result.trace_id == "trace-verbatim"
+
+    def test_failed_report_sets_summary_to_failure_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.FAILED, failure="something broke")
+
+        result = execution_report_to_wire(report)
+
+        assert result.summary == "something broke"
+
+    def test_successful_report_sets_summary_to_empty_string(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.COMPLETED, failure=None)
+
+        result = execution_report_to_wire(report)
+
+        assert result.summary == ""
+
+    def test_final_phase_and_duration_map_correctly(self) -> None:
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(phase=ExecutionPhase.CANCELLED, duration=timedelta(seconds=3))
+
+        result = execution_report_to_wire(report)
+
+        assert result.final_phase == worker_pb2.EXECUTION_PHASE_CANCELLED
+        assert result.duration.ToTimedelta() == timedelta(seconds=3)
+
+    def test_wire_report_never_carries_resource_usage_or_metrics(self) -> None:
+        """D16 row: `resource_usage`/`metrics` — "Dropped, by contract
+        design... The transport does not synthesize one." The wire
+        `ExecutionReport` message structurally has no such field
+        (`__slots__ = ("final_phase", "duration", "trace_id", "summary")`),
+        so this asserts the wire type itself carries no such field rather
+        than merely checking a value."""
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(resource_usage={"cpu_seconds": 99.0}, metrics={"tokens": 100.0})
+
+        result = execution_report_to_wire(report)
+
+        assert not hasattr(result, "resource_usage")
+        assert not hasattr(result, "metrics")
+
+    def test_wire_report_never_carries_logs(self) -> None:
+        """D16 row: `logs` — "Dropped... the correct fix, if ever needed,
+        is a `.proto` change." The wire `ExecutionReport` message
+        structurally has no `logs` field."""
+        from tibios_ray.transport.convert import execution_report_to_wire
+
+        report = _report(logs=("a log line",))
+
+        result = execution_report_to_wire(report)
+
+        assert not hasattr(result, "logs")
+
+
+class TestExecutionPulseToWire:
+    """3b.9 — `execution_pulse_to_wire`'s phase/health-only mapping; D16
+    row: `ExecutionPulse.detail` — "Dropped. Set by nothing, anywhere
+    (verified)"."""
+
+    def test_phase_and_healthy_map_correctly(self) -> None:
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RUNNING, healthy=True)
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert result.phase == worker_pb2.EXECUTION_PHASE_RUNNING
+        assert result.healthy is True
+
+    def test_unhealthy_pulse_maps_healthy_false(self) -> None:
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RECEIVED, healthy=False)
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert result.healthy is False
+
+    def test_wire_pulse_never_carries_detail(self) -> None:
+        """The wire `ExecutionPulse` message structurally has no `detail`
+        field (`__slots__ = ("phase", "healthy")`)."""
+        from tibios_ray.transport.convert import execution_pulse_to_wire
+
+        pulse = ExecutionPulse(phase=ExecutionPhase.RUNNING, healthy=True, detail="some detail")
+
+        result = execution_pulse_to_wire(pulse)
+
+        assert not hasattr(result, "detail")
+
+    def test_nothing_in_src_constructs_execution_pulse_with_detail_set(self) -> None:
+        """D16 row: "Set by nothing, anywhere (verified)" — a recursive
+        source search confirms no production code constructs an
+        `ExecutionPulse` with `detail` set to a non-None value."""
+        import ast
+        from pathlib import Path
+
+        src_root = Path(__file__).resolve().parents[3] / "src" / "tibios_ray"
+        offenders: list[str] = []
+        for path in src_root.rglob("*.py"):
+            if "_generated" in path.parts:
+                continue
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if name != "ExecutionPulse":
+                    continue
+                for keyword in node.keywords:
+                    if keyword.arg == "detail" and not (
+                        isinstance(keyword.value, ast.Constant) and keyword.value.value is None
+                    ):
+                        offenders.append(str(path))
+
+        assert offenders == []
+
+
+class TestExecutionEventToWireWarning:
+    """3b.7 — D16 row: `Warning.code` — "Dropped... inventing a `[code]
+    msg` parse format on a frozen contract creates an unversioned
+    side-channel"."""
+
+    def test_message_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Warning(message="disk space low", code="LOW_DISK")
+
+        result = execution_event_to_wire(event)
+
+        assert result.warning.message == "disk space low"
+
+    def test_code_is_dropped_and_never_prefixed_into_message(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Warning(message="disk space low", code="LOW_DISK")
+
+        result = execution_event_to_wire(event)
+
+        assert not hasattr(result.warning, "code")
+        assert "LOW_DISK" not in result.warning.message
+        assert result.warning.message == "disk space low"
+
+
+class TestExecutionEventToWireProgress:
+    """3b.10 — D16 row: `Progress.message` — "proto3 has no absent
+    scalar; documented"."""
+
+    def test_message_present_maps_verbatim(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Progress(fraction_complete=0.25, message="halfway there")
+
+        result = execution_event_to_wire(event)
+
+        assert result.progress.fraction_complete == 0.25
+        assert result.progress.message == "halfway there"
+
+    def test_none_message_maps_to_empty_string(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = Progress(fraction_complete=0.5, message=None)
+
+        result = execution_event_to_wire(event)
+
+        assert result.progress.message == ""
+
+
+class TestExecutionEventToWireOutputChunk:
+    """3b.11 — D16 row: `OutputChunk.sequence` — "a Worker bug, surfaced
+    rather than truncated"."""
+
+    def test_well_formed_chunk_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=7)
+
+        result = execution_event_to_wire(event)
+
+        assert result.output_chunk.data == b"hello"
+        assert result.output_chunk.sequence == 7
+
+    def test_negative_sequence_raises_invalid_sequence_error(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=-1)
+
+        with pytest.raises(InvalidSequenceError) as excinfo:
+            execution_event_to_wire(event)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_sequence_at_or_above_2_pow_64_raises_invalid_sequence_error(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=2**64)
+
+        with pytest.raises(InvalidSequenceError) as excinfo:
+            execution_event_to_wire(event)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_max_valid_sequence_converts_successfully_not_truncated(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = OutputChunk(data=b"hello", sequence=2**64 - 1)
+
+        result = execution_event_to_wire(event)
+
+        assert result.output_chunk.sequence == 2**64 - 1
+
+
+class TestExecutionEventToWireCheckpointCreated:
+    """3b.12 — D16 row: `CheckpointCreated.checkpoint_id` — "the owning
+    domain defines validity and the adapter does not second-guess,"
+    mirroring `ContentHash`'s treatment."""
+
+    def test_checkpoint_id_wraps_verbatim_into_checkpoint_object_id(self) -> None:
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = CheckpointCreated(checkpoint_id="not-a-ulid-at-all")
+
+        result = execution_event_to_wire(event)
+
+        assert result.checkpoint_created.checkpoint_object_id.value == "not-a-ulid-at-all"
+
+    def test_no_ulid_validation_performed_at_this_boundary(self) -> None:
+        """A well-formed ULID converts too, proving the same code path
+        handles both — no branch performs ULID validation here."""
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = CheckpointCreated(checkpoint_id=_ULID_A)
+
+        result = execution_event_to_wire(event)
+
+        assert result.checkpoint_created.checkpoint_object_id.value == _ULID_A
+
+
+class TestExecutionEventToWireEndOfStream:
+    """3b.8 — D16 row: `EndOfStream.reason` — "Dropped, and demonstrably
+    non-lossy on the only path that sets it"."""
+
+    def test_reason_never_reaches_the_wire(self) -> None:
+        """The wire `EndOfStream` message is structurally empty
+        (`__slots__ = ()`)."""
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = EndOfStream(reason="something failed")
+
+        result = execution_event_to_wire(event)
+
+        assert result.HasField("end_of_stream")
+        assert not hasattr(worker_pb2.EndOfStream(), "reason")
+
+    def test_end_of_stream_reason_is_demonstrably_non_lossy_via_worker_runtime(self) -> None:
+        """Drives a real `WorkerRuntime.execute` against a failing
+        fixture Provider (never a hand-rolled `EndOfStream` in
+        isolation): `EndOfStream.reason` is dropped by
+        `execution_event_to_wire`, but the same information reaches the
+        wire via `report.failure` -> `execution_report_to_wire`'s
+        `summary` fold (3b.4) — proving the drop is non-lossy on the
+        only path (`worker_runtime.py`'s `execute()`) that ever sets
+        `reason`."""
+        import asyncio
+
+        from tibios_ray.backends.adapter import BackendId
+        from tibios_ray.capabilities.descriptor import (
+            CapabilityDescriptor,
+            CapabilityFlags,
+            ModelFamily,
+        )
+        from tibios_ray.capabilities.names import CapabilityName
+        from tibios_ray.execution.context import ExecutionContext
+        from tibios_ray.runtime.registry import CapabilityRegistry
+        from tibios_ray.runtime.worker_runtime import WorkerRuntime
+        from tibios_ray.testing import FakeExecutionContext, InMemoryExecutionChannel, StubProvider
+        from tibios_ray.transport.convert import execution_event_to_wire, execution_report_to_wire
+
+        async def _raising_execute(context: ExecutionContext) -> ExecutionReport:
+            raise RuntimeError("provider exploded")
+
+        descriptor = CapabilityDescriptor(
+            capability=CapabilityName("boom.explode"),
+            families=frozenset({ModelFamily("deepseek")}),
+            backends=frozenset({BackendId("llama_cpp")}),
+            flags=CapabilityFlags(streaming=True),
+        )
+        provider = StubProvider(capability_descriptor=descriptor, on_execute=_raising_execute)
+        channel = InMemoryExecutionChannel()
+        registry = CapabilityRegistry([provider])
+        runtime = WorkerRuntime(registry)
+        context = FakeExecutionContext(capability="boom.explode", channel=channel)
+
+        report = asyncio.run(runtime.execute(context))
+
+        assert report.failure is not None
+        assert "provider exploded" in report.failure
+        end_of_stream_event = channel.emitted[-1]
+        assert isinstance(end_of_stream_event, EndOfStream)
+        assert end_of_stream_event.reason == report.failure
+
+        wire_event = execution_event_to_wire(end_of_stream_event)
+        assert not hasattr(worker_pb2.EndOfStream(), "reason")
+        assert wire_event.HasField("end_of_stream")
+
+        wire_report = execution_report_to_wire(report)
+        assert wire_report.summary == report.failure == end_of_stream_event.reason
