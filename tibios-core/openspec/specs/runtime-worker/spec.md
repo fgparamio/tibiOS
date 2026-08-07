@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`runtime-worker` is the Worker domain's public language and its Inbound Port, implementing `18-worker-model.md`. It exposes `WorkerService` — the Inbound Port through which the Runtime invokes a Worker (`02-project-structure.md:196`) — and `ExecutionChannel` — the Worker-owned Outbound Port through which a Worker emits events — together with the domain types that flow through both, all outside `adapters/`.
+`runtime-worker` is the Worker domain's public language and its Inbound Port, implementing `18-worker-model.md`. It exposes `WorkerService` — the Inbound Port through which the Runtime invokes a Worker (`02-project-structure.md:196`) — and `ExecutionChannel` — the Worker-owned Outbound Port through which a Worker emits events — together with the domain types that flow through both, all outside `adapters/`. It also hosts exactly one concrete `WorkerService` implementation (`RayWorker`), private to `adapters::grpc` and reachable only via a factory function.
 
 ## Requirements
 
@@ -192,3 +192,19 @@
 - GIVEN every item reachable from outside `runtime-worker` (its public API, including `WorkerService`, `ExecutionChannel`, and every domain type)
 - WHEN each signature, field type, and trait bound is inspected
 - THEN no `tonic::`, `prost::`, or `tokio::` path appears anywhere in it
+
+### Requirement: runtime-worker May Host Exactly One Concrete WorkerService Implementation, Exposed Only Via Factory
+
+`runtime-worker` MAY contain a concrete `WorkerService` implementation (`RayWorker`) inside its existing private `adapters::grpc` tree, provided it is reachable from outside the crate only through a factory function returning `impl WorkerService` (never the concrete type), and provided this addition introduces no new workspace-crate dependency and no external dependency outside the existing `{tonic, prost}` allowlist.
+
+#### Scenario: RayWorker adds no new dependency
+
+- GIVEN `crates/runtime-worker/Cargo.toml` before and after `RayWorker` is added
+- WHEN its dependency list is diffed
+- THEN it is unchanged
+
+#### Scenario: RayWorker's concrete type stays unreachable outside the factory
+
+- GIVEN `runtime-worker`'s public API after `RayWorker` is added
+- WHEN it is inspected
+- THEN `RayWorker` itself is not a public item — only a factory function returning `impl WorkerService` is
