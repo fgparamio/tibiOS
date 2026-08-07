@@ -39,6 +39,25 @@ def _all_capabilities_source_files() -> list[Path]:
     return sorted(_CAPABILITIES_ROOT.rglob("*.py"))
 
 
+# Slice 7 (D18/D24/D25): `chat.py`/`embedding.py`/`rerank.py` gained real
+# dispatch logic — an empty-mapping check, an unresolvable-`plan.backend`
+# check, and cooperative cancellation are all legitimate conditionals a
+# wired Provider's `execute()` now contains (`capability-providers` spec:
+# "Dispatch-mechanical conditionals in wired Providers are not routing
+# violations"; `provider-backend-composition` spec: "Every conditional
+# present is dispatch-mechanical"). This exemption list names exactly the
+# three wired Provider modules, by module stem — nothing else is ever
+# exempted from the no-branching scan below.
+_WIRED_PROVIDER_MODULE_STEMS = frozenset({"chat", "embedding", "rerank"})
+
+
+def _unwired_provider_module_paths() -> list[Path]:
+    """`_provider_module_paths()` minus the three wired modules."""
+    return [
+        path for path in _provider_module_paths() if path.stem not in _WIRED_PROVIDER_MODULE_STEMS
+    ]
+
+
 class TestCatalogConformance:
     def test_all_providers_register_together_without_rejection(self) -> None:
         registry = CapabilityRegistry(list(_PROVIDERS))
@@ -74,10 +93,17 @@ class TestCatalogConformance:
             isinstance(provider.descriptor.capability, CapabilityName) for provider in _PROVIDERS
         )
 
-    def test_no_branching_exists_in_any_provider_module(self) -> None:
+    def test_no_branching_exemption_list_names_exactly_the_three_wired_modules(self) -> None:
+        # Asserts the exemption list itself, hardcoded — not derived from
+        # `_provider_module_paths()` — so a future accidental addition to
+        # `_WIRED_PROVIDER_MODULE_STEMS` cannot silently widen the
+        # no-branching guard's blind spot without this test catching it.
+        assert _WIRED_PROVIDER_MODULE_STEMS == {"chat", "embedding", "rerank"}
+
+    def test_no_branching_exists_in_any_unwired_provider_module(self) -> None:
         violations: dict[str, list[str]] = {}
 
-        for path in _provider_module_paths():
+        for path in _unwired_provider_module_paths():
             tree = ast.parse(path.read_text())
             found = [
                 type(node).__name__ for node in ast.walk(tree) if isinstance(node, _THRESHOLD_OPS)
@@ -86,9 +112,10 @@ class TestCatalogConformance:
                 violations[str(path)] = found
 
         assert not violations, (
-            "found a conditional/comparison node in a Provider module — "
-            "no Provider may branch on anything until Phase 4 lands real "
-            f"execution (design.md 'No branching' check): {violations}"
+            "found a conditional/comparison node in an unwired Provider "
+            "module — an unwired Provider (Vision, Speech x2, OCR) always "
+            "raises unconditionally and must never branch on anything "
+            f"(design.md 'No branching' check): {violations}"
         )
 
     def test_capabilities_package_imports_nothing_from_runtime(self) -> None:
