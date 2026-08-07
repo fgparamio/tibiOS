@@ -60,6 +60,27 @@ class AllocationContract:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class SecurityContext:
+    """Tenant/principal/scope carried by the Execution Context — never
+    interpreted by a Worker to make authorization or dispatch decisions
+    (``18-worker-model.md:136``, ``execution-identity``)."""
+
+    tenant_id: str
+    principal_id: str
+    grant_scope: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ObservabilityContext:
+    """Trace/span identifiers carried by the Execution Context — MAY be
+    propagated into observability outputs but MUST NOT influence dispatch
+    or control-flow decisions (``execution-identity``)."""
+
+    trace_id: str
+    span_id: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExecutionContext:
     """Everything required to execute one unit of work, created by the
     Runtime and immutable thereafter (``18-worker-model.md``)."""
@@ -67,5 +88,8 @@ class ExecutionContext:
     capability: str
     allocation_contract: AllocationContract
     dependencies: Mapping[str, ResolvedModelRef]
+    security_context: SecurityContext
+    observability_context: ObservabilityContext
+    execution_parameters: Mapping[str, str]
     channel: ExecutionChannel
     cancellation: CancellationToken
