@@ -27,6 +27,12 @@ llamacpp = ["llama-cpp-python>=0.3.34,<0.4"]
 # a cp314 build; a real GPU install today targets a <3.14 interpreter
 # for this extra specifically.
 vllm = ["vllm>=0.9.0,<0.10; python_version < '3.14'"]
+# Two artifacts, one debt (design.md OR10): `model_path` and
+# `tokenizer_path` ship as separate construction arguments with nothing
+# here verifying they are a matched pair — discharged by a future
+# change that resolves `ResolvedModelRef` into an atomic artifact
+# bundle, not by this extra.
+onnx = ["onnxruntime>=1.20.0", "transformers>=4.46.0"]
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
