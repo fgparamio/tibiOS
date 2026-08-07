@@ -45,7 +45,7 @@ Per ADR-0002, each wired Provider's `execute()`:
 3. `plan = self._selection_policy.plan(model, constraints)`
 4. `backend = self._backends[plan.backend]` — a fixed injected dict lookup, not a registry, not a service locator
 5. `await backend.acquire(plan)` → capability method (`generate` / `embed` / `rerank`) → `release(session)` in a `finally`
-6. streams results onto `context.channel` as `OutputChunk`s, terminated by `EndOfStream`, polling `context.cancellation` cooperatively
+6. streams results onto `context.channel` as `OutputChunk`s, polling `context.cancellation` cooperatively — `WorkerRuntime` terminates the channel with `EndOfStream` after dispatch completes
 7. returns an `ExecutionReport` — never carrying application output (`18-worker-model.md`)
 
 Providers contain **no selection logic** — no scoring, no capability matching, no backend branching. The only conditionals a Provider gains are dispatch-mechanical (empty mapping, unknown `plan.backend`, cancellation), and every one raises or terminates rather than choosing a backend.
@@ -67,7 +67,8 @@ Strict TDD throughout (`uv run pytest`). Continue design-decision numbering at *
 | `tests/unit/capabilities/test_provider_conformance.py` | Modified | Wired/unwired split |
 | `tests/unit/capabilities/test_catalog_conformance.py` | Modified | No-branching scan narrowed to four modules |
 | `tests/unit/{selection,test_worker}.py`, `tests/unit/config/` | New/Modified | Policy, composition, config |
-| `src/tibios_ray/{runtime,transport,engines,backends}/**` | Untouched | Contracts and engines unchanged |
+| `src/tibios_ray/engines/llamacpp.py` | Modified | Pool of N pre-warmed instances per ADR-0003 (see Open Design Question 3) |
+| `src/tibios_ray/{runtime,transport,backends}/**`, `src/tibios_ray/engines/{vllm,onnxrt}.py` | Untouched | Contracts and the other two engines unchanged |
 
 ## Test Impact
 
@@ -112,7 +113,7 @@ Purely additive except three Provider constructors and `worker.py`. Reverting th
 
 ## Delivery
 
-Estimated **~600–900 hand-written lines** — over the 400-line review budget, so **chained PRs are expected**. Natural slices: (1) config surface; (2) concrete `ModelSelectionPolicy` + test doubles; (3) `ChatProvider` wiring (the streaming case, hardest first); (4) `EmbeddingProvider` + `RerankProvider` (the batch cases); (5) Composition Root + conformance-test split. `sdd-tasks` owns the final split and MUST emit the Review Workload Forecast.
+Estimated **~1000–1300 hand-written lines** — over the 400-line review budget, so **chained PRs are expected**. Revised upward from an earlier ~600-900 estimate, which omitted the `engines/llamacpp.py` pool work ADR-0003 requires (see the Affected Areas correction above). Natural slices: (1) config surface; (2) concrete `ModelSelectionPolicy` + test doubles; (3) `ChatProvider` wiring (the streaming case, hardest first); (4) `EmbeddingProvider` + `RerankProvider` (the batch cases); (5) `engines/llamacpp.py` pool (independent, may land in parallel); (6) Composition Root + conformance-test split. `sdd-tasks` owns the final split and MUST emit the Review Workload Forecast.
 
 ## Dependencies
 

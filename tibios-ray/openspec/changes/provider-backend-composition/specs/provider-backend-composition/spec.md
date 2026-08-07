@@ -79,15 +79,18 @@ Per ADR-0002, a wired Provider's `execute()` MUST: build
 `self._selection_policy.plan(model, constraints)`; look up
 `self._backends[plan.backend]`; `acquire(plan)` → capability method
 (`generate`/`embed`/`rerank`) → `release(session)`; stream results onto
-`context.channel` as `OutputChunk`s terminated by `EndOfStream`; poll
-`context.cancellation` cooperatively; return an `ExecutionReport` that
-never carries application output (`18-worker-model.md`).
+`context.channel` as `OutputChunk`s; poll `context.cancellation`
+cooperatively; return an `ExecutionReport` that never carries application
+output (`18-worker-model.md`). The Provider produces the functional
+`OutputChunk` events only — `WorkerRuntime` owns terminating the channel
+with `EndOfStream` after dispatch completes, for every outcome.
 
 #### Scenario: Successful dispatch streams output and returns COMPLETED
 
 - GIVEN a wired Provider with a non-empty backend mapping and a policy that resolves a valid plan
 - WHEN `execute()` runs to completion
-- THEN the resolved Backend's `acquire()` is called with the plan, its capability method runs, `release()` is called, one or more `OutputChunk`s are emitted followed by `EndOfStream`, and the returned `ExecutionReport.phase == COMPLETED`
+- THEN the resolved Backend's `acquire()` is called with the plan, its capability method runs, `release()` is called, one or more `OutputChunk`s are emitted, and the returned `ExecutionReport.phase == COMPLETED`
+- AND `WorkerRuntime.execute()` terminates the channel with `EndOfStream` after `execute()` returns
 
 #### Scenario: Cooperative cancellation is observed mid-execution
 
@@ -144,8 +147,11 @@ decision; this requirement fixes only the transport.
 Per ADR-0002, the three wired Providers SHALL NOT implement backend
 selection logic — no branching, scoring, or capability-matching inside
 `execute()`. Only dispatch-mechanical conditionals are permitted: an
-empty backend mapping, a `plan.backend` absent from that mapping, and
-cooperative cancellation.
+empty backend mapping, a `plan.backend` absent from that mapping,
+cooperative cancellation, and validating the number of entries in
+`context.dependencies` (zero vs. one vs. more than one) before selecting
+among them per the "Model Reference Selection From Context Dependencies"
+requirement.
 
 #### Scenario: No scoring or capability-matching code exists
 
@@ -157,7 +163,7 @@ cooperative cancellation.
 
 - GIVEN the three wired Providers' `execute()` bodies
 - WHEN their conditionals are enumerated
-- THEN each guards only an empty mapping, an unresolvable `plan.backend`, or cooperative cancellation — none re-implements what `plan()` already decided
+- THEN each guards only an empty mapping, an unresolvable `plan.backend`, cooperative cancellation, or the number of entries in `context.dependencies` — none re-implements what `plan()` already decided
 
 ### Requirement: Failure Outcomes Are Behaviorally Distinguishable
 
