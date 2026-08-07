@@ -18,6 +18,7 @@ class TestExecutionPhase:
             "running",
             "completed",
             "failed",
+            "cancelled",
         }
 
 

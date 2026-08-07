@@ -23,6 +23,7 @@ class ExecutionPhase(Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
