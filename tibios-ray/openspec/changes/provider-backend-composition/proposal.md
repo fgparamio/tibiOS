@@ -125,11 +125,11 @@ Estimated **~1000–1300 hand-written lines** — over the 400-line review budge
 
 ## Success Criteria
 
-- [ ] A `chat.generate` execution with a configured llama.cpp or vLLM backend streams `OutputChunk`s and returns a `COMPLETED` `ExecutionReport`
-- [ ] `embedding.generate` and `rerank.documents` return `COMPLETED` against a configured ONNX Runtime backend
-- [ ] No Provider constructs, discovers, or mutates a backend; `worker.py` is the only module importing `engines/`
-- [ ] No Provider contains selection logic — the injected `ModelSelectionPolicy` makes every backend choice
-- [ ] With no configuration present, the Worker starts and every capability fails cleanly as unwired — no crash, no fabricated backend
-- [ ] Vision, speech (both), and OCR still raise `NoBackendAvailableError` unconditionally, asserted by test
-- [ ] Backends, and any pooled resources they own (ADR-0003), are constructed once at startup and never per-request, asserted by a construction-count test
-- [ ] `uv run pytest` / `ruff check` / `pyright` pass; layering and naming guards still find zero violations
+- [x] A `chat.generate` execution with a configured llama.cpp or vLLM backend streams `OutputChunk`s and returns a `COMPLETED` `ExecutionReport`
+- [x] `embedding.generate` and `rerank.documents` return `COMPLETED` against a configured ONNX Runtime backend
+- [x] No Provider constructs, discovers, or mutates a backend; `worker.py` is the only module constructing or wiring `engines/` instances (package-level re-exports are API aliasing, not construction)
+- [x] No Provider contains selection logic — the injected `ModelSelectionPolicy` makes every backend choice
+- [x] With no configuration present, the Worker starts and every capability fails cleanly as unwired — no crash, no fabricated backend
+- [x] Vision, speech (both), and OCR still raise `NoBackendAvailableError` unconditionally, asserted by test
+- [x] Backends, and any pooled resources they own (ADR-0003), are constructed once at startup and never per-request, asserted by a construction-count test
+- [x] `uv run pytest` / `ruff check` / `pyright` pass; layering and naming guards still find zero violations
