@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
-from tibios_ray.execution.ids import ContentHash, ObjectId, ObjectVersion
+from tibios_ray.execution.ids import (
+    AllocationId,
+    ContentHash,
+    ObjectId,
+    ObjectVersion,
+    WorkloadId,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -90,8 +96,16 @@ class ObservabilityContext:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ExecutionContext:
     """Everything required to execute one unit of work, created by the
-    Runtime and immutable thereafter (``18-worker-model.md``)."""
+    Runtime and immutable thereafter (``18-worker-model.md``).
 
+    Ten fields, eight of them wire-visible (design decision D8); no
+    nested envelope — ``18-worker-model.md:52`` describes one immutable
+    Execution Context containing all of it. ``channel``/``cancellation``
+    stay domain-only: the wire has no field for either.
+    """
+
+    workload_id: WorkloadId
+    allocation_id: AllocationId
     capability: str
     allocation_contract: AllocationContract
     dependencies: tuple[ResolvedModelRef, ...]

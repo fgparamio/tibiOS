@@ -26,7 +26,7 @@ from tibios_ray.execution.context import (
     ResolvedModelRef,
     SecurityContext,
 )
-from tibios_ray.execution.ids import ContentHash, ObjectId, ObjectVersion
+from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
 from tibios_ray.execution.report import ExecutionPhase, ExecutionReport
 from tibios_ray.runtime.registry import CapabilityRegistry
 from tibios_ray.runtime.worker_runtime import WorkerRuntime
@@ -84,6 +84,8 @@ def _default_observability_context() -> ObservabilityContext:
 def _context(
     *,
     capability: str = "chat.generate",
+    workload_id: WorkloadId | None = None,
+    allocation_id: AllocationId | None = None,
     security_context: SecurityContext | None = None,
     observability_context: ObservabilityContext | None = None,
     execution_parameters: dict[str, str] | None = None,
@@ -91,6 +93,8 @@ def _context(
     channel: InMemoryExecutionChannel | None = None,
 ) -> ExecutionContext:
     return ExecutionContext(
+        workload_id=workload_id or WorkloadId("01J0000000000000000000010"),
+        allocation_id=allocation_id or AllocationId("01J0000000000000000000011"),
         capability=capability,
         allocation_contract=_allocation_contract(),
         dependencies=dependencies,
@@ -181,6 +185,28 @@ class TestDependenciesIsOrderedAndUnkeyed:
         assert ctx.dependencies == (first_ref, second_ref)
         assert ctx.dependencies[0] is first_ref
         assert ctx.dependencies[1] is second_ref
+
+
+class TestExecutionContextTenFields:
+    def test_constructs_with_all_ten_keyword_only_fields(self) -> None:
+        # D8: ExecutionContext grows to ten fields, no envelope. kw_only
+        # is already set, so widening the constructor breaks no
+        # positional call site.
+        ctx = ExecutionContext(
+            workload_id=WorkloadId("01J0000000000000000000010"),
+            allocation_id=AllocationId("01J0000000000000000000011"),
+            capability="chat.generate",
+            allocation_contract=_allocation_contract(),
+            dependencies=(),
+            security_context=_default_security_context(),
+            observability_context=_default_observability_context(),
+            execution_parameters={},
+            channel=InMemoryExecutionChannel(),
+            cancellation=ManualCancellation(),
+        )
+
+        assert ctx.workload_id == WorkloadId("01J0000000000000000000010")
+        assert ctx.allocation_id == AllocationId("01J0000000000000000000011")
 
 
 class TestResolvedModelRef:
