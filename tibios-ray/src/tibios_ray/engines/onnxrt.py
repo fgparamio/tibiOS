@@ -18,12 +18,64 @@ sharing is free rather than merely convenient. The async bridge is
 llama.cpp's off-loop thread hop (OR7), not vLLM's native-async
 `generate()` — ORT's `run()` is a blocking call.
 
-PR 1 (this file's current state) builds the seams: both Protocols, both
-default factories, `_OnnxResidency`, and `_OnnxBackendBase`'s residency
-lifecycle (`backend_id`/`supports`/`acquire`/`release`). Both public
-classes exist with their execution method (`embed`/`rerank`) raising
-`NotImplementedError` — PR 2 implements `_infer`, `_rows`, and the two
-execution methods (design.md "Slice Plan").
+PR 1 built the seams: both Protocols, both default factories,
+`_OnnxResidency`, and `_OnnxBackendBase`'s residency lifecycle
+(`backend_id`/`supports`/`acquire`/`release`). PR 2 (this file's current
+state) adds the execution path: `_infer`, `_rows`, `OnnxOutputShapeError`,
+and the two execution methods, `embed`/`rerank` (design.md "Slice
+Plan").
+
+**Concurrent `run()` calls on one shared session are safe by design
+(OR3), not by defensive locking** — `_infer()` calls
+`InferenceSessionLike.run()` with no lock held, from an arbitrary
+worker thread (`asyncio.to_thread`), concurrently across every session
+that shares one `_OnnxResidency`. This is deliberately the inversion of
+`llamacpp.py`'s per-session lock (LC4): `InferenceSession` owns no
+per-request mutable state (OR2's rationale), and ONNX Runtime documents
+`Run()` on a shared session as thread-safe, explicitly recommending one
+session shared across threads over one session per thread. Verified
+against ONNX Runtime maintainers, not merely asserted: a maintainer
+confirms concurrent `Run()` calls on a shared session are the officially
+recommended usage in
+[microsoft/onnxruntime#10107](https://github.com/microsoft/onnxruntime/discussions/10107)
+("creating multiple sessions for each thread is a huge waste of
+resources and this is strongly discouraged"); C++-level confirmation
+that concurrent `Run()` calls from different threads are safe and
+weights are shared is in
+[microsoft/onnxruntime#14073](https://github.com/microsoft/onnxruntime/discussions/14073).
+A lock here would convert a documented-parallel engine into a serial
+one for a safety property ORT already provides — what genuinely is
+*not* thread-safe is session construction/mutation, which is exactly
+what `self._lock` already covers under OR2. The opt-in integration
+smoke (`tests/integration/test_onnxrt_smoke.py`) is the empirical
+discharge of this claim in this environment (OR4).
+
+Accepted, explicit limitations (design.md):
+- **Per-EP concurrency beyond CPU is unverified (OR4).** CUDA EP is
+  confirmed safe but serializes on the session's single compute
+  stream — concurrency there hides latency, it does not buy device
+  throughput. TensorRT/DirectML are unexamined. If some execution
+  provider ever proves unsafe, the fix is a caller-supplied locking
+  decorator satisfying `InferenceSessionLike`, never a branch inside
+  this module.
+- **Residency is per-Backend-instance, not per-process (OR2).** Two
+  `OnnxEmbeddingBackend` instances load the model twice; "one instance
+  per family per modality" is a composition-root obligation that does
+  not exist yet.
+- **The Artifact Bundle (model/tokenizer path pairing, OR10) is
+  unverified.** Nothing checks that `model_path` and `tokenizer_path`
+  are a matching pair — a mismatch produces garbage vectors, not an
+  error.
+- **No pooling, no normalization, no batching policy (OR9).** A 3-D
+  `last_hidden_state` output is refused via `OnnxOutputShapeError`
+  rather than silently mean-pooled; every call is one `run()` over the
+  full input sequence.
+- **The stub cannot prove the real SDK signature (VL8's caveat,
+  inherited).** `run(output_names, input_feed)`'s real shape, numpy
+  I/O, `get_inputs()`'s `NodeArg`, and `AutoTokenizer`'s real return
+  type are proven only by the opt-in integration smoke.
+- **The CUDA execution provider is untested here.** OR4's escape hatch
+  is designed, not exercised; the smoke test runs CPU only.
 """
 
 import asyncio
@@ -167,6 +219,11 @@ class _OnnxBackendBase:
         self._tokenizer_factory = tokenizer_factory
         self._providers = tuple(providers)
         self._output_name = output_name
+        # OR9/OR10: `run(output_names, ...)` wants `Sequence[str] | None`,
+        # never a bare `str` — computed once here, not per call.
+        self._output_names: Sequence[str] | None = (
+            [output_name] if output_name is not None else None
+        )
         self._lock = asyncio.Lock()
         self._residency: _OnnxResidency | None = None
         self._sessions: dict[str, _OnnxResidency] = {}
@@ -238,24 +295,91 @@ class _OnnxBackendBase:
             raise UnknownSessionError(session.session_id)
         return residency
 
+    async def _infer(
+        self,
+        session: BackendSession,
+        text: Sequence[str],
+        text_pair: Sequence[str] | None,
+    ) -> Sequence[Sequence[float]]:
+        # The one execution path shared by both modalities (design.md
+        # "Key Contracts"). `_residency_for` is a plain dict lookup, run
+        # on the calling coroutine; everything synchronous and blocking
+        # — tokenize, `run()`, row extraction — is inside `_blocking`,
+        # the single span offloaded by `asyncio.to_thread` (OR7). No
+        # lock is held here or inside `_blocking` (OR3): construction is
+        # the only thing `self._lock` guards.
+        residency = self._residency_for(session)
+
+        def _blocking() -> Sequence[Sequence[float]]:
+            encoded = residency.tokenizer(
+                text,
+                text_pair,
+                padding=True,
+                truncation=True,
+                return_tensors="np",
+            )
+            feed = {
+                key: value for key, value in encoded.items() if key in residency.input_names
+            }  # OR8: filtered against the graph's own declared inputs
+            outputs = residency.session.run(self._output_names, feed)  # OR3: no lock
+            return _rows(outputs[0])  # OR9: 2-D or OnnxOutputShapeError
+
+        return await asyncio.to_thread(_blocking)
+
+
+class OnnxOutputShapeError(ValueError):
+    """Raised when the selected output is not a rectangular 2-D
+    `[batch, N]` result (design decision OR9) — e.g. an un-pooled 3-D
+    `last_hidden_state`. The adapter never pools or normalizes: point
+    `output_name` at a pooled output, or re-export the model with
+    pooling baked in."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "ONNX Runtime output is not a rectangular 2-D [batch, N] result "
+            "— this adapter never pools or normalizes; point `output_name` "
+            "at a pooled output, or re-export the model with pooling baked in"
+        )
+
+
+def _rows(output: Sequence[Any]) -> Sequence[Sequence[float]]:
+    # Duck-typed, never numpy-bound (OR6/OR9): a well-formed 2-D result
+    # is any sequence of sequences of numbers. A 1-D or 3-D+ result
+    # fails the inner `float(value)` conversion — a scalar row isn't
+    # iterable, and a nested-list row isn't a number — so both
+    # malformed shapes are caught by the same conversion, not by a
+    # separate rank check.
+    rows: list[tuple[float, ...]] = []
+    for row in output:
+        try:
+            rows.append(tuple(float(value) for value in row))
+        except TypeError as error:
+            raise OnnxOutputShapeError from error
+    return rows
+
 
 class OnnxEmbeddingBackend(_OnnxBackendBase):
     """Satisfies `EmbeddingBackend` structurally — no base-Protocol
-    edge (OR5). `embed()` is implemented in PR 2 (design.md "Slice
-    Plan")."""
+    edge (OR5)."""
 
     async def embed(self, session: BackendSession, inputs: Sequence[str]) -> Sequence[Vector]:
-        raise NotImplementedError  # PR 2: `_infer`/`_rows` (OR3/OR7/OR8/OR9)
+        if not inputs:  # OR9: empty input -> empty result, `run` never called
+            return []
+        rows = await self._infer(session, list(inputs), None)
+        return [Vector(values=tuple(row)) for row in rows]
 
 
 class OnnxRerankBackend(_OnnxBackendBase):
     """Satisfies `RerankBackend` structurally — no base-Protocol edge
-    (OR5). `rerank()` is implemented in PR 2 (design.md "Slice Plan")."""
+    (OR5)."""
 
     async def rerank(
         self, session: BackendSession, query: str, documents: Sequence[str]
     ) -> Sequence[RerankResult]:
-        raise NotImplementedError  # PR 2: `_infer`/`_rows` (OR3/OR6/OR9)
+        if not documents:  # symmetric with embed()'s empty-input rule
+            return []
+        rows = await self._infer(session, [query] * len(documents), list(documents))  # OR6
+        return [RerankResult(index=i, score=row[0]) for i, row in enumerate(rows)]
 
 
 def _new_session_id() -> str:
