@@ -3,22 +3,35 @@
 This is the single place inside tibios-ray where "Worker" refers to the
 entity seen by tibios-core's Runtime over gRPC (per
 ``../tibios-core/docs/architecture/18-worker-model.md``). It builds a
-:class:`tibios_ray.runtime.registry.CapabilityRegistry` from the set of
-registered Capability Providers and owns exactly one
-:class:`tibios_ray.runtime.worker_runtime.WorkerRuntime`, then dispatches
-each incoming Execution Context to the registered Capability Provider that
-matches its capability — never to a "Worker" internally. Both types are
-real, implemented contracts as of the ``ray-worker-runtime`` change
-(``openspec/changes/ray-worker-runtime/design.md``, Phases 4-5), not
-placeholders; only the composition performed *here* — instantiating a
-``CapabilityRegistry`` with the concrete Capability Providers and handing
-it to a ``WorkerRuntime`` — remains to be written.
-
-That composition, and the gRPC transport that will call into it, are
-blocked on the shared ``.proto`` Worker Contract definition, which does
-not yet exist in this repo (proposed shared location: ``../TibiOS/proto/``,
-see ``server.py``). A sibling change, ``proto-worker-contract``, is in
-progress in ``tibios-core`` as of this writing to define that contract; this
-module intentionally does not anticipate its shape. Placeholder only —
-zero business logic.
+:class:`tibios_ray.runtime.registry.CapabilityRegistry` from the seven
+concrete Capability Providers and hands it to exactly one
+:class:`tibios_ray.runtime.worker_runtime.WorkerRuntime` — the whole
+composition ``server.py`` needs before it can call
+``transport.serve(build_runtime(), address)``. Imports zero ``grpc``/
+``_pb2`` symbol (design decision D13); the gRPC transport that calls into
+this composition lives entirely in ``transport/``.
 """
+
+from tibios_ray.capabilities.chat import ChatProvider
+from tibios_ray.capabilities.embedding import EmbeddingProvider
+from tibios_ray.capabilities.ocr import OcrProvider
+from tibios_ray.capabilities.rerank import RerankProvider
+from tibios_ray.capabilities.speech import SpeechSynthesisProvider, SpeechTranscriptionProvider
+from tibios_ray.capabilities.vision import VisionProvider
+from tibios_ray.runtime.registry import CapabilityRegistry
+from tibios_ray.runtime.worker_runtime import WorkerRuntime
+
+
+def build_runtime() -> WorkerRuntime:
+    """Builds the one `CapabilityRegistry` from the seven Capability
+    Providers and hands it to the one `WorkerRuntime`."""
+    providers = (
+        ChatProvider(),
+        EmbeddingProvider(),
+        OcrProvider(),
+        RerankProvider(),
+        SpeechTranscriptionProvider(),
+        SpeechSynthesisProvider(),
+        VisionProvider(),
+    )
+    return WorkerRuntime(CapabilityRegistry(providers))
