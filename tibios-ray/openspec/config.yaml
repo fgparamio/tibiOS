@@ -13,19 +13,20 @@ context: |
     - docs/architecture/25-ai-runtime.md — confirms tibios-ray gets no special treatment.
   The gRPC/proto contract does not exist yet (proposed shared location: ../TibiOS/proto/).
   Until it exists, 18-worker-model.md is the source of truth for what the interface must express.
-  Testing: none configured yet (no pytest/ruff/black/mypy declared in pyproject.toml).
+  Testing: pytest, ruff, and pyright have been configured since the python-foundation
+  change; strict TDD is active project-wide.
   Style: conventional commits, no AI attribution (global CLAUDE.md policy).
 
 testing:
-  strict_tdd: false
-  strict_tdd_reason: "unavailable — no test runner detected"
-  test_runner: none configured yet
+  strict_tdd: true
+  strict_tdd_reason: "pytest/ruff/pyright configured in pyproject.toml since python-foundation"
+  test_runner: "uv run pytest"
   layers:
-    unit: false
-    integration: false
+    unit: true
+    integration: true
     e2e: false
     contract: false
-  quality_tools: none configured yet (no ruff/black/mypy in pyproject.toml)
+  quality_tools: ruff, pyright (both declared in pyproject.toml)
 
 rules:
   proposal:
@@ -44,10 +45,10 @@ rules:
     - Group by phase, use hierarchical numbering
     - Keep tasks completable in one session
   apply:
-    - tdd: false
-    - test_command: none configured yet
+    - tdd: true
+    - test_command: "uv run pytest"
   verify:
-    test_command: none configured yet
+    test_command: "uv run pytest"
     build_command: "uv build"
     coverage_threshold: 0
   archive:
