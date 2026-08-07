@@ -17,6 +17,7 @@ from google.protobuf import duration_pb2
 from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.events import (
     CheckpointCreated,
+    EndOfStream,
     OutputChunk,
     Progress,
     Warning,
@@ -921,3 +922,74 @@ class TestExecutionEventToWireCheckpointCreated:
         result = execution_event_to_wire(event)
 
         assert result.checkpoint_created.checkpoint_object_id.value == _ULID_A
+
+
+class TestExecutionEventToWireEndOfStream:
+    """3b.8 — D16 row: `EndOfStream.reason` — "Dropped, and demonstrably
+    non-lossy on the only path that sets it"."""
+
+    def test_reason_never_reaches_the_wire(self) -> None:
+        """The wire `EndOfStream` message is structurally empty
+        (`__slots__ = ()`)."""
+        from tibios_ray.transport.convert import execution_event_to_wire
+
+        event = EndOfStream(reason="something failed")
+
+        result = execution_event_to_wire(event)
+
+        assert result.HasField("end_of_stream")
+        assert not hasattr(worker_pb2.EndOfStream(), "reason")
+
+    def test_end_of_stream_reason_is_demonstrably_non_lossy_via_worker_runtime(self) -> None:
+        """Drives a real `WorkerRuntime.execute` against a failing
+        fixture Provider (never a hand-rolled `EndOfStream` in
+        isolation): `EndOfStream.reason` is dropped by
+        `execution_event_to_wire`, but the same information reaches the
+        wire via `report.failure` -> `execution_report_to_wire`'s
+        `summary` fold (3b.4) — proving the drop is non-lossy on the
+        only path (`worker_runtime.py`'s `execute()`) that ever sets
+        `reason`."""
+        import asyncio
+
+        from tibios_ray.backends.adapter import BackendId
+        from tibios_ray.capabilities.descriptor import (
+            CapabilityDescriptor,
+            CapabilityFlags,
+            ModelFamily,
+        )
+        from tibios_ray.capabilities.names import CapabilityName
+        from tibios_ray.execution.context import ExecutionContext
+        from tibios_ray.runtime.registry import CapabilityRegistry
+        from tibios_ray.runtime.worker_runtime import WorkerRuntime
+        from tibios_ray.testing import FakeExecutionContext, InMemoryExecutionChannel, StubProvider
+        from tibios_ray.transport.convert import execution_event_to_wire, execution_report_to_wire
+
+        async def _raising_execute(context: ExecutionContext) -> ExecutionReport:
+            raise RuntimeError("provider exploded")
+
+        descriptor = CapabilityDescriptor(
+            capability=CapabilityName("boom.explode"),
+            families=frozenset({ModelFamily("deepseek")}),
+            backends=frozenset({BackendId("llama_cpp")}),
+            flags=CapabilityFlags(streaming=True),
+        )
+        provider = StubProvider(capability_descriptor=descriptor, on_execute=_raising_execute)
+        channel = InMemoryExecutionChannel()
+        registry = CapabilityRegistry([provider])
+        runtime = WorkerRuntime(registry)
+        context = FakeExecutionContext(capability="boom.explode", channel=channel)
+
+        report = asyncio.run(runtime.execute(context))
+
+        assert report.failure is not None
+        assert "provider exploded" in report.failure
+        end_of_stream_event = channel.emitted[-1]
+        assert isinstance(end_of_stream_event, EndOfStream)
+        assert end_of_stream_event.reason == report.failure
+
+        wire_event = execution_event_to_wire(end_of_stream_event)
+        assert not hasattr(worker_pb2.EndOfStream(), "reason")
+        assert wire_event.HasField("end_of_stream")
+
+        wire_report = execution_report_to_wire(report)
+        assert wire_report.summary == report.failure == end_of_stream_event.reason
