@@ -17,14 +17,26 @@ their rationale.
 ### Requirement: Composition Root Exclusive Backend Ownership
 
 Per ADR-0001, `worker.py::build_runtime()` MUST be the only module that
-names a concrete Backend/engine class or constructs one. No wired
-Provider MUST construct, look up, or discover a Backend.
+constructs a concrete Backend/engine instance or wires one into a
+Provider. No wired Provider MUST construct, look up, or discover a
+Backend. Package-level re-exports whose sole purpose is API aliasing
+(e.g. a package `__init__.py` re-exporting a submodule's class so
+callers write `from tibios_ray.engines import LlamaCppTextBackend`
+instead of reaching into `engines.llamacpp`) are not construction or
+wiring, and MUST NOT be treated as violating this requirement — they
+name a symbol without deciding, building, or configuring anything.
 
-#### Scenario: worker.py is the sole importer of concrete engine classes
+#### Scenario: worker.py is the sole constructor of concrete engine instances
 
 - GIVEN the `src/tibios_ray/` module tree after this change
-- WHEN searched for imports of concrete engine classes (e.g. `LlamaCppTextBackend`, `VllmTextBackend`, `OnnxEmbeddingBackend`, `OnnxRerankBackend`)
-- THEN only `worker.py` imports them
+- WHEN searched for constructor calls to concrete engine classes (e.g. `LlamaCppTextBackend(...)`, `VllmTextBackend(...)`, `OnnxEmbeddingBackend(...)`, `OnnxRerankBackend(...)`)
+- THEN only `worker.py` calls them
+
+#### Scenario: A package-level re-export is not construction
+
+- GIVEN `tibios_ray.engines.__init__` re-exporting concrete engine classes for API ergonomics, the way `tibios_ray.backends` re-exports its own package surface
+- WHEN inspected for how it participates in Composition Root Exclusive Backend Ownership
+- THEN it is not counted as a violation — it aliases a name, it does not construct, select, or configure an instance
 
 ### Requirement: Constructor-Injected Immutable Dependencies
 

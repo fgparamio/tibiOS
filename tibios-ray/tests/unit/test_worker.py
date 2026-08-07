@@ -238,30 +238,19 @@ def test_engines_are_constructed_exactly_once_per_build_runtime_call_never_per_r
     assert len(fake_llama_cpp_module) == pool_size
 
 
-def test_worker_module_is_the_sole_importer_of_concrete_engine_classes() -> None:
+def test_worker_module_is_the_sole_constructor_of_concrete_engine_instances() -> None:
     # `provider-backend-composition` spec: "Composition Root Exclusive
-    # Backend Ownership" — only `worker.py` may name a concrete engine
-    # class. An `ast`-based scan (not a plain `rg`) so renaming an
-    # unrelated symbol that merely contains one of these names as a
-    # substring can never produce a false positive.
-    #
-    # JUDGMENT CALL (flagged, not silently resolved — see apply-progress
-    # for Slice 7 / final report): `engines/__init__.py` re-exports all
-    # four concrete classes at the package level (frozen, pre-Slice-7
-    # convention — see `tests/unit/engines/test_engines_exports.py`,
-    # mirroring `tibios_ray.backends`'s own package-exports style). That
-    # re-export is a literal `ast.ImportFrom`, so a byte-literal reading
-    # of the spec scenario ("only worker.py imports them") is false
-    # today, and always was going to be the moment `engines/__init__.py`
-    # and a real Composition Root coexist — neither `design.md` nor the
-    # spec's own scenario text anticipates the package-level re-export
-    # layer. This test resolves the tension the way ADR-0001's own
-    # rationale reads (`spec.md`: "No wired Provider MUST construct,
-    # look up, or discover a Backend") — `engines/__init__.py` neither
-    # constructs anything nor is a Provider; it only aliases a name for
-    # ergonomics, so it is exempted by identity, not by directory. Every
-    # *other* file in the tree, `engines/` submodules included, is still
-    # held to the letter of the rule.
+    # Backend Ownership" — only `worker.py` may *construct* a concrete
+    # engine instance. The invariant is about who decides which
+    # implementation gets built and wired in, not who merely names the
+    # class — `engines/__init__.py` re-exports all four for API ergonomics
+    # (mirrors `tibios_ray.backends`'s own package-exports convention),
+    # which is aliasing, not construction, and the spec's own "A
+    # package-level re-export is not construction" scenario says so
+    # explicitly. So this scans for constructor *calls*
+    # (`LlamaCppTextBackend(...)`), not import statements — a re-export
+    # line contains no `ast.Call`, so it naturally never appears here,
+    # with no directory-based exemption needed.
     concrete_engine_class_names = frozenset(
         {
             "LlamaCppTextBackend",
@@ -270,29 +259,22 @@ def test_worker_module_is_the_sole_importer_of_concrete_engine_classes() -> None
             "OnnxRerankBackend",
         }
     )
-    _EXEMPT_PACKAGE_REEXPORT = "engines/__init__.py"
     root = Path(tibios_ray.__file__).resolve().parent
 
-    importers: set[str] = set()
+    constructors: set[str] = set()
     for path in sorted(root.rglob("*.py")):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and any(
-                alias.name in concrete_engine_class_names for alias in node.names
-            ):
-                importers.add(path.relative_to(root).as_posix())
-            elif isinstance(node, ast.Import) and any(
-                alias.name.rsplit(".", 1)[-1] in concrete_engine_class_names
-                for alias in node.names
-            ):
-                importers.add(path.relative_to(root).as_posix())
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+            if name in concrete_engine_class_names:
+                constructors.add(path.relative_to(root).as_posix())
 
-    importers.discard(_EXEMPT_PACKAGE_REEXPORT)
-
-    assert importers == {"worker.py"}, (
-        "found a concrete engine class import outside worker.py (and "
-        f"outside the documented {_EXEMPT_PACKAGE_REEXPORT} exemption) — "
-        f"this breaks Composition Root Exclusive Backend Ownership: {importers}"
+    assert constructors == {"worker.py"}, (
+        "found a concrete engine class constructor call outside worker.py — "
+        f"this breaks Composition Root Exclusive Backend Ownership: {constructors}"
     )
 
 

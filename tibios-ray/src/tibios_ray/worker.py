@@ -21,13 +21,15 @@ rationale — the tension ``proposal.md`` flags, unchanged from D6).
 
 Per the ``provider-backend-composition`` spec's "Composition Root
 Exclusive Backend Ownership": this is the *only* module in
-``src/tibios_ray/`` that names a concrete Backend/engine class
+``src/tibios_ray/`` that constructs a concrete Backend/engine instance
 (``LlamaCppTextBackend``, ``VllmTextBackend``, ``OnnxEmbeddingBackend``,
-``OnnxRerankBackend``) or constructs one — enforced by
-``tests/unit/test_worker.py``'s import-scan guard (task 7.6). No wired
-Provider constructs, looks up, or discovers a Backend; each is handed an
-already-built, immutable mapping plus the one shared
-``ModelSelectionPolicy`` instance (ADR-0001/ADR-0002).
+``OnnxRerankBackend``) — enforced by ``tests/unit/test_worker.py``'s
+constructor-call-scan guard (task 7.6). ``engines/__init__.py``'s
+package-level re-export of those same classes is API aliasing, not
+construction, and is not a violation. No wired Provider constructs,
+looks up, or discovers a Backend; each is handed an already-built,
+immutable mapping plus the one shared ``ModelSelectionPolicy`` instance
+(ADR-0001/ADR-0002).
 """
 
 from tibios_ray.backends.adapter import BackendId
