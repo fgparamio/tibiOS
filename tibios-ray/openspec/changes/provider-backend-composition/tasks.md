@@ -77,11 +77,11 @@ No dependencies. May run in parallel with Slice 1.
 - [x] 2.3 Implement: `src/tibios_ray/selection/errors.py` — `UnsatisfiablePlanError` (D21, D28; `selection/` MUST NOT import `capabilities/`)
 - [x] 2.4 Implement: `src/tibios_ray/selection/preference.py` — `ARTIFACT_DEFINED = Quantization(scheme="artifact-defined", bits=0)` sentinel (D23), `PreferenceOrderPolicy(preference: tuple[BackendId, ...])` (D28)
 - [x] 2.5 Modify: `src/tibios_ray/selection/__init__.py` — re-export `PreferenceOrderPolicy`, `ARTIFACT_DEFINED`, `UnsatisfiablePlanError` in `__all__`
-- [ ] 2.6 Test: `tests/unit/testing/test_testing_policy.py`, `test_testing_text_backend.py`, `test_testing_embedding_backend.py`, `test_testing_rerank_backend.py` — each fake conforms to its Protocol and its recording/injection knobs behave as documented (following `RecordingBackend`'s existing test pattern)
-- [ ] 2.7 Implement: `src/tibios_ray/testing/policy.py` — a fake/injectable `ModelSelectionPolicy` for Provider tests (returns a caller-supplied plan or raises on demand)
-- [ ] 2.8 Implement: `src/tibios_ray/testing/text_backend.py`, `testing/embedding_backend.py`, `testing/rerank_backend.py` — fakes conforming to `TextGenerationBackend`/embedding/rerank Backend Protocols, following `RecordingBackend`'s shape (records acquired/released sessions; injectable to raise at `acquire`/execute/`release`)
-- [ ] 2.9 Modify: `src/tibios_ray/testing/__init__.py` — register the four new fakes in `__all__` (naming-audit guard in `tests/unit/runtime/test_naming_audit.py` applies — no "Worker"-named identifier)
-- [ ] 2.10 Verify slice 2 green: `uv run pytest tests/unit/selection/ tests/unit/testing/ && uv run ruff check src/tibios_ray/selection/ src/tibios_ray/testing/ && uv run pyright src/tibios_ray/selection/ src/tibios_ray/testing/`
+- [x] 2.6 Test: `tests/unit/testing/test_testing_policy.py`, `test_testing_text_backend.py`, `test_testing_embedding_backend.py`, `test_testing_rerank_backend.py` — each fake conforms to its Protocol and its recording/injection knobs behave as documented (following `RecordingBackend`'s existing test pattern)
+- [x] 2.7 Implement: `src/tibios_ray/testing/policy.py` — a fake/injectable `ModelSelectionPolicy` for Provider tests (returns a caller-supplied plan or raises on demand)
+- [x] 2.8 Implement: `src/tibios_ray/testing/text_backend.py`, `testing/embedding_backend.py`, `testing/rerank_backend.py` — fakes conforming to `TextGenerationBackend`/embedding/rerank Backend Protocols, following `RecordingBackend`'s shape (records acquired/released sessions; injectable to raise at `acquire`/execute/`release`)
+- [x] 2.9 Modify: `src/tibios_ray/testing/__init__.py` — register the four new fakes in `__all__` (naming-audit guard in `tests/unit/runtime/test_naming_audit.py` applies — no "Worker"-named identifier)
+- [x] 2.10 Verify slice 2 green: `uv run pytest tests/unit/selection/ tests/unit/testing/ && uv run ruff check src/tibios_ray/selection/ src/tibios_ray/testing/ && uv run pyright src/tibios_ray/selection/ src/tibios_ray/testing/`
 
 ## Slice 3 — Requests + failure taxonomy + dispatch helpers
 
