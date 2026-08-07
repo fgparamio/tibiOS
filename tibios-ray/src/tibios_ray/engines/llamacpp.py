@@ -8,12 +8,19 @@ base class, design decision D1) and turns llama.cpp's blocking sync
 token generator into a non-blocking async `AsyncIterator[TextChunk]`.
 
 Slice 1 built the residency seam: `backend_id`, `supports`, `acquire`,
-`release`. Slice 2 (this file's current state) adds the real streaming
-implementation: `generate()` is a thread-bridge async generator —
-`_pump`/`_put` run the blocking SDK generator on a dedicated `Thread`
-and hand tokens across a bounded `asyncio.Queue`, with terminal-chunk
-detection by one-token lookahead on stream exhaustion (LC8), not the
-SDK's `finish_reason` (design.md "Slice Plan", "Key Contracts").
+`release`. Slice 2 added the real streaming implementation: `generate()`
+is a thread-bridge async generator — `_pump`/`_put` run the blocking SDK
+generator on a dedicated `Thread` and hand tokens across a bounded
+`asyncio.Queue`, with terminal-chunk detection by one-token lookahead on
+stream exhaustion (LC8), not the SDK's `finish_reason` (design.md "Slice
+Plan", "Key Contracts"). Slice 6 (this file's current state) replaces
+per-call `Llama` construction with a pool of `pool_size` pre-warmed
+instances, built eagerly in `__init__` (ADR-0003, D26/D27,
+`llamacpp-text-backend` spec "Residency Is Backend-Owned, Not
+Request-Owned") — `acquire()` checks an instance out of an
+`asyncio.Queue`-backed pool and never constructs one; `release()` returns
+it for reuse and never closes it; exhaustion waits up to a configured
+timeout then raises `PoolExhaustedError`.
 
 Accepted, explicit limitations (design.md):
 - GGUF resolution is out of band: `model_path` is supplied at
@@ -28,6 +35,7 @@ Accepted, explicit limitations (design.md):
 
 import asyncio
 import importlib
+import os
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from concurrent.futures import CancelledError
@@ -47,6 +55,14 @@ LLAMA_CPP_BACKEND_ID = BackendId("llama_cpp")
 # not measurements (design.md "Open Questions").
 _QUEUE_MAXSIZE = 8
 _PUT_POLL_SECONDS = 0.05
+
+# D26: how long `acquire()` waits for a pool instance to free up before
+# raising `PoolExhaustedError`. A documented default, not a measurement
+# (design.md "Open Questions") — env-var wiring
+# (`TIBIOS_RAY_LLAMACPP_ACQUIRE_TIMEOUT_SECONDS`) is deferred to whichever
+# future change adds it to `config.py`; this slice exposes it as a plain
+# constructor keyword.
+_DEFAULT_ACQUIRE_TIMEOUT_SECONDS = 30.0
 
 
 class LlamaLike(Protocol):
@@ -107,6 +123,25 @@ class UnknownSessionError(LookupError):
         self.session_id = session_id
 
 
+class PoolExhaustedError(Exception):
+    """Raised by `acquire()` when every pooled `Llama` instance is
+    checked out and none is `release()`d before `acquire_timeout`
+    elapses (design decisions D26/D27; `llamacpp-text-backend` spec
+    "Residency Is Backend-Owned, Not Request-Owned", scenario
+    "Exhaustion waits, then fails explicitly"). The timeout bounds the
+    wait for a free residency, not the duration of any inference. Since
+    the timeout fires *inside* `acquire()`, no session is ever handed
+    out for that attempt — `release()` is correctly never called."""
+
+    def __init__(self, *, pool_size: int, timeout_seconds: float) -> None:
+        super().__init__(
+            f"llama.cpp pool exhausted: all {pool_size} instance(s) are "
+            f"checked out and none was released within {timeout_seconds}s"
+        )
+        self.pool_size = pool_size
+        self.timeout_seconds = timeout_seconds
+
+
 @dataclass(slots=True)
 class _Residency:
     """Per-session residency (design decision LC2): the value that never
@@ -115,7 +150,8 @@ class _Residency:
     `BackendSession` handle. `lock` and `thread` are mutable state,
     which is exactly why this is not `frozen=True` like `BackendSession`.
     `thread` stays `None` until `generate()` starts a pump thread for
-    this session; `release()` joins it before `close()` (LC9)."""
+    this session; `release()` joins it before returning the instance to
+    the pool (LC9; D26 — no `close()`, the pool reuses it)."""
 
     llama: LlamaLike
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -222,12 +258,49 @@ def _pump(
 
 class LlamaCppTextBackend:
     """The first concrete Backend Adapter (`llamacpp-text-backend` spec).
-    Satisfies `TextGenerationBackend` structurally — no base class."""
+    Satisfies `TextGenerationBackend` structurally — no base class.
 
-    def __init__(self, *, model_path: str, factory: LlamaFactory = default_llama_factory) -> None:
+    Owns a pool of `pool_size` pre-warmed `Llama` instances, built
+    eagerly during `__init__` (ADR-0003, D26/D27) — never lazily, never
+    per-request. `acquire()` checks an instance out of the pool without
+    ever constructing one; `release()` returns it for reuse."""
+
+    def __init__(
+        self,
+        *,
+        model_path: str,
+        factory: LlamaFactory = default_llama_factory,
+        pool_size: int = 1,
+        acquire_timeout: float = _DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
+    ) -> None:
+        # D27: two cheap, deterministic pre-checks, in this order, before
+        # any (expensive) construction happens — a typo'd path or a
+        # nonsensical pool size must never trigger even the first
+        # eager `Llama` construction.
+        if pool_size < 1:
+            raise ValueError(f"llama.cpp pool_size must be >= 1, got {pool_size!r}")
+        if not os.path.isfile(model_path):
+            raise FileNotFoundError(
+                f"llama.cpp model_path does not exist or is not a file: {model_path!r}"
+            )
+        if not os.access(model_path, os.R_OK):
+            raise PermissionError(f"llama.cpp model_path is not readable: {model_path!r}")
+
         self._model_path = model_path
         self._factory = factory
+        self._pool_size = pool_size
+        self._acquire_timeout = acquire_timeout
         self._sessions: dict[str, _Residency] = {}
+        # D26/D27: eager, synchronous construction of all `pool_size`
+        # instances at Backend-construction time — this *is* the
+        # startup viability check (a failure here propagates out of
+        # `__init__`, hence out of `build_runtime()`). `asyncio.Queue`
+        # does not need a running event loop to be constructed or
+        # `put_nowait`-filled; only `get()`/`put()` (awaited in
+        # `acquire()`/`release()`) do.
+        self._pool: asyncio.Queue[LlamaLike] = asyncio.Queue(maxsize=pool_size)
+        for _ in range(pool_size):
+            self._pool.put_nowait(self._factory(self._model_path))
 
     @property
     def backend_id(self) -> BackendId:
@@ -240,11 +313,17 @@ class LlamaCppTextBackend:
         return plan.backend == LLAMA_CPP_BACKEND_ID
 
     async def acquire(self, plan: ServingPlanLike) -> BackendSession:
-        # LC3: loading GGUF weights is seconds-to-minutes of blocking
-        # I/O, so construction runs off the event loop, and one `Llama`
-        # is built per call — that per-call independence is what makes
-        # LC4's per-session (not per-process) locking claim real.
-        llama = await asyncio.to_thread(self._factory, self._model_path)
+        # D26: no construction here — only checking an already-warm
+        # instance out of the pool. Bounded wait, then an explicit
+        # failure; never blocks forever (`llamacpp-text-backend` spec,
+        # "Exhaustion waits, then fails explicitly").
+        try:
+            async with asyncio.timeout(self._acquire_timeout):
+                llama = await self._pool.get()
+        except TimeoutError:
+            raise PoolExhaustedError(
+                pool_size=self._pool_size, timeout_seconds=self._acquire_timeout
+            ) from None
         session_id = f"llamacpp-{uuid4().hex}"
         self._sessions[session_id] = _Residency(llama=llama)
         return BackendSession(backend_id=LLAMA_CPP_BACKEND_ID, session_id=session_id)
@@ -254,17 +333,19 @@ class LlamaCppTextBackend:
         if residency is None:
             raise UnknownSessionError(session.session_id)
 
-        def _stop_join_close() -> None:
-            # LC9: `generate()`'s pump thread is joined before
-            # `close()`, off-loop, in this single `to_thread` call.
-            # `residency.thread` is `None` until the first `generate()`
-            # call populates it (or if `generate()` was never called on
-            # this session), in which case this is a no-op.
+        def _stop_join() -> None:
+            # LC9: `generate()`'s pump thread is joined off-loop before
+            # the instance goes back to the pool. `residency.thread` is
+            # `None` until the first `generate()` call populates it (or
+            # if `generate()` was never called on this session), in
+            # which case this is a no-op.
             if residency.thread is not None:
                 residency.thread.join()
-            residency.llama.close()
 
-        await asyncio.to_thread(_stop_join_close)
+        await asyncio.to_thread(_stop_join)
+        # D26: returned for reuse, never closed — instances are
+        # process-scoped (ADR-0001); closing here would defeat the pool.
+        self._pool.put_nowait(residency.llama)
 
     def _residency_for(self, session: BackendSession) -> _Residency:
         residency = self._sessions.get(session.session_id)

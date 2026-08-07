@@ -15,6 +15,7 @@ both scenarios, made deterministic by structure rather than timing:
 
 import asyncio
 import threading
+from pathlib import Path
 
 from stub_llama import StubLlama
 
@@ -37,9 +38,15 @@ async def _drain(
     return [chunk async for chunk in backend.generate(session, request)]
 
 
-def test_serializes_within_session() -> None:
+def _gguf_path(tmp_path: Path) -> str:
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"not a real gguf, just needs to exist and be readable")
+    return str(path)
+
+
+def test_serializes_within_session(tmp_path: Path) -> None:
     stub = StubLlama(tokens=("only",))
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> list[list[TextChunk]]:
         session = await backend.acquire(_PLAN)
@@ -75,7 +82,7 @@ def test_serializes_within_session() -> None:
     assert stub.max_active_count <= 1
 
 
-def test_independence_across_sessions() -> None:
+def test_independence_across_sessions(tmp_path: Path) -> None:
     barrier = threading.Barrier(2, timeout=5.0)
     stubs: list[StubLlama] = []
 
@@ -84,7 +91,13 @@ def test_independence_across_sessions() -> None:
         stubs.append(stub)
         return stub
 
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=factory)
+    # `pool_size=2`: this test acquires two distinct sessions
+    # concurrently to prove the per-session lock (LC4) is not
+    # global/per-process — it needs two pre-warmed instances available
+    # at once, not one.
+    backend = LlamaCppTextBackend(
+        model_path=_gguf_path(tmp_path), factory=factory, pool_size=2
+    )
 
     async def scenario() -> list[list[TextChunk]]:
         session_a = await backend.acquire(_PLAN)

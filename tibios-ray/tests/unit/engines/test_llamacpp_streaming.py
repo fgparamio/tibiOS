@@ -5,6 +5,7 @@ Transport-Agnostic" and "Non-Blocking Thread-Bridge Streaming" —
 
 import asyncio
 import threading
+from pathlib import Path
 
 from stub_llama import StubLlama
 
@@ -21,13 +22,19 @@ class _Plan:
 _PLAN = _Plan(BackendId("llama_cpp"))
 
 
+def _gguf_path(tmp_path: Path) -> str:
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"not a real gguf, just needs to exist and be readable")
+    return str(path)
+
+
 async def _drain(
     backend: LlamaCppTextBackend, session: BackendSession, request: TextRequest
 ) -> list[TextChunk]:
     return [chunk async for chunk in backend.generate(session, request)]
 
 
-def test_streams_not_buffers() -> None:
+def test_streams_not_buffers(tmp_path: Path) -> None:
     """LC8's one-token lookahead means the first chunk is not emitted
     until a second raw item has arrived (real token or exhaustion) —
     a one-item skew, not "wait for the whole completion". Both tokens
@@ -42,7 +49,7 @@ def test_streams_not_buffers() -> None:
         block_before_index=2,
         block_event=block_event,
     )
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> list[TextChunk]:
         session = await backend.acquire(_PLAN)
@@ -67,14 +74,14 @@ def test_streams_not_buffers() -> None:
     ]
 
 
-def test_loop_stays_alive() -> None:
+def test_loop_stays_alive(tmp_path: Path) -> None:
     """If `generate()` blocked the event loop while the pump thread is
     parked, the concurrent `bump()` task below could never run and this
     test would deadlock — deterministic by construction, not by
     sleeps."""
     block_event = threading.Event()
     stub = StubLlama(tokens=("only",), block_before_index=0, block_event=block_event)
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> tuple[list[TextChunk], bool]:
         session = await backend.acquire(_PLAN)
@@ -100,9 +107,9 @@ def test_loop_stays_alive() -> None:
     assert collected == [TextChunk(text="only", finished=True)]
 
 
-def test_terminal_semantics() -> None:
+def test_terminal_semantics(tmp_path: Path) -> None:
     backend = LlamaCppTextBackend(
-        model_path="model.gguf",
+        model_path=_gguf_path(tmp_path),
         factory=lambda path: StubLlama(tokens=("a", "b", "c")),
     )
 
@@ -117,9 +124,9 @@ def test_terminal_semantics() -> None:
     assert [c.finished for c in chunks] == [False, False, True]
 
 
-def test_terminal_semantics_empty_completion_yields_one_finished_chunk() -> None:
+def test_terminal_semantics_empty_completion_yields_one_finished_chunk(tmp_path: Path) -> None:
     backend = LlamaCppTextBackend(
-        model_path="model.gguf",
+        model_path=_gguf_path(tmp_path),
         factory=lambda path: StubLlama(tokens=()),
     )
 
@@ -132,9 +139,9 @@ def test_terminal_semantics_empty_completion_yields_one_finished_chunk() -> None
     assert chunks == [TextChunk(text="", finished=True)]
 
 
-def test_terminal_semantics_drops_empty_text_raw_chunks() -> None:
+def test_terminal_semantics_drops_empty_text_raw_chunks(tmp_path: Path) -> None:
     backend = LlamaCppTextBackend(
-        model_path="model.gguf",
+        model_path=_gguf_path(tmp_path),
         factory=lambda path: StubLlama(tokens=("a", "", "b", "")),
     )
 
@@ -150,9 +157,9 @@ def test_terminal_semantics_drops_empty_text_raw_chunks() -> None:
     ]
 
 
-def test_parameter_mapping() -> None:
+def test_parameter_mapping(tmp_path: Path) -> None:
     stub = StubLlama(tokens=("ok",))
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> None:
         session = await backend.acquire(_PLAN)
@@ -177,10 +184,10 @@ def test_parameter_mapping() -> None:
     ]
 
 
-def test_exception_propagation() -> None:
+def test_exception_propagation(tmp_path: Path) -> None:
     boom = RuntimeError("boom")
     stub = StubLlama(tokens=("a", "b"), error=boom, error_before_index=1)
-    backend = LlamaCppTextBackend(model_path="model.gguf", factory=lambda path: stub)
+    backend = LlamaCppTextBackend(model_path=_gguf_path(tmp_path), factory=lambda path: stub)
 
     async def scenario() -> list[TextChunk]:
         session = await backend.acquire(_PLAN)
