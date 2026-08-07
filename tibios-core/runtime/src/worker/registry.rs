@@ -87,6 +87,27 @@ impl Registry {
         })
     }
 
+    /// True when the runtime side no longer wants this execution to
+    /// continue: either `cancel` was accepted, or the registration is gone
+    /// entirely — which means `execute`'s future was dropped and nobody is
+    /// waiting (design.md D9). The `is_none()` half is the part a naive
+    /// `is_cancelled` reuse would miss: it is how an abandoned blocking task
+    /// learns nobody is waiting anymore.
+    ///
+    /// Temporary: `LocalInferWorker` (the only caller) isn't wired into
+    /// `main.rs`'s bin target until PR3 — until then this is dead code from
+    /// the bin target's point of view, though fully exercised by this
+    /// module's own tests. Disappears once PR3 lands.
+    #[allow(dead_code)]
+    pub(super) fn should_stop(&self, workload_id: WorkloadId) -> bool {
+        self.with_registry(|state| {
+            state
+                .get(&workload_id)
+                .is_none_or(|registration| registration.cancelled)
+        })
+    }
+
+
     /// Idempotent while registered (`worker-inbound-port/design.md` D11
     /// Decision): every call against a still-registered id returns another
     /// `Ok(CancelAck)`, never an error.
@@ -198,5 +219,30 @@ mod tests {
             reacquired.is_some(),
             "dropping the guard must free the workload id for reacquisition"
         );
+    }
+
+    /// Task 2.2 / design.md D9: `should_stop` is true when cancelled, true
+    /// when the registration is absent entirely (deregistered or never
+    /// existed), and false when present and not cancelled.
+    #[test]
+    fn should_stop_is_true_when_cancelled_true_when_absent_false_otherwise() {
+        let registry = Registry::new();
+        let cancelled_id = WorkloadId::new();
+        let present_id = WorkloadId::new();
+        let never_registered_id = WorkloadId::new();
+
+        registry.insert_if_absent(cancelled_id);
+        registry
+            .cancel(cancelled_id)
+            .expect("cancel on a freshly registered id must succeed");
+        assert!(registry.should_stop(cancelled_id));
+
+        registry.insert_if_absent(present_id);
+        assert!(!registry.should_stop(present_id));
+
+        assert!(registry.should_stop(never_registered_id));
+
+        registry.deregister(present_id);
+        assert!(registry.should_stop(present_id));
     }
 }
