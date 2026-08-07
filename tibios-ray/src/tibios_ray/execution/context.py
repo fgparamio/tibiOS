@@ -49,13 +49,20 @@ class ResolvedModelRef:
 class AllocationContract:
     """Immutable execution constraints a Capability Provider honors —
     never creates, modifies, or renews (``18-worker-model.md`` /
-    ``15-allocation-model.md``)."""
+    ``15-allocation-model.md``).
 
-    exclusive: bool
-    renewable_lease: bool
-    preemptible: bool
-    migration_allowed: bool
-    checkpoint_required: bool
+    Intentionally partial: carries exactly ``max_execution_duration``,
+    matching ``runtime-allocation``'s own shape verbatim (design decision
+    D9). tibios-ray is a *consumer* of this contract — per
+    ``02-project-structure.md``'s Ownership Boundaries table
+    (``Allocation -> AllocationContract -> Worker``), the producer owns
+    the contract's shape, so this type MUST NOT define fields the
+    producer does not send. ``15-allocation-model.md``'s own future
+    change is the sole owner of the remaining facets (exclusive/shared,
+    renewable lease, preemptible, migration allowed, checkpoint
+    required).
+    """
+
     max_execution_duration: timedelta
 
 

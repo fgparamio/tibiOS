@@ -47,14 +47,7 @@ def _resolved_model_ref() -> ResolvedModelRef:
 
 
 def _allocation_contract() -> AllocationContract:
-    return AllocationContract(
-        exclusive=True,
-        renewable_lease=False,
-        preemptible=False,
-        migration_allowed=True,
-        checkpoint_required=False,
-        max_execution_duration=timedelta(minutes=30),
-    )
+    return AllocationContract(max_execution_duration=timedelta(minutes=30))
 
 
 def _descriptor(capability: str) -> CapabilityDescriptor:
@@ -210,13 +203,35 @@ class TestResolvedModelRef:
 class TestAllocationContract:
     def test_holds_its_fields(self) -> None:
         contract = _allocation_contract()
-        assert contract.exclusive is True
         assert contract.max_execution_duration == timedelta(minutes=30)
 
     def test_is_frozen(self) -> None:
         contract = _allocation_contract()
         with pytest.raises(dataclasses.FrozenInstanceError):
-            contract.exclusive = False  # type: ignore[misc]
+            contract.max_execution_duration = timedelta(minutes=1)  # type: ignore[misc]
+
+    def test_carries_exactly_max_execution_duration(self) -> None:
+        # D9: AllocationContract narrows to exactly one field — the producer
+        # (runtime-allocation) owns the contract; tibios-ray never redefines
+        # its shape (`execution-identity` — "AllocationContract has no
+        # fields beyond max_execution_duration").
+        field_names = {f.name for f in dataclasses.fields(AllocationContract)}
+        assert field_names == {"max_execution_duration"}
+
+    def test_rejects_the_five_removed_fields_as_unexpected_keyword_arguments(self) -> None:
+        removed = {
+            "exclusive": True,
+            "renewable_lease": False,
+            "preemptible": False,
+            "migration_allowed": False,
+            "checkpoint_required": False,
+        }
+        for field_name, value in removed.items():
+            with pytest.raises(TypeError):
+                AllocationContract(
+                    max_execution_duration=timedelta(minutes=5),
+                    **{field_name: value},
+                )
 
 
 class TestExecutionContext:
