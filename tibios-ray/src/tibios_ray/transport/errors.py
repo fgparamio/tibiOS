@@ -97,6 +97,19 @@ class NegativeDurationError(ConversionError):
         super().__init__(f"{field} is negative")
 
 
+class InvalidSequenceError(ConversionError):
+    """A domain `OutputChunk.sequence` (outbound, S3b) is negative or does
+    not fit in the wire's unsigned 64-bit `sequence` field. A Worker bug
+    that produced such a value is surfaced as a rejection rather than
+    silently truncated (D16 — "a Worker bug, surfaced rather than
+    truncated")."""
+
+    def __init__(self, field: str, value: int) -> None:
+        self.field = field
+        self.value = value
+        super().__init__(f"{field} does not fit in an unsigned 64-bit integer: {value!r}")
+
+
 class CorrelationError(Exception):
     """Base of the in-flight-`WorkloadId` correlation rejection family
     (consumed by S4a's registry and S4b's servicer). Every member

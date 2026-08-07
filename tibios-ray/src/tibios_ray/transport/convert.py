@@ -11,7 +11,7 @@ guessed, or silently fabricated.
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
 
 from google.protobuf import duration_pb2
@@ -26,6 +26,7 @@ from tibios_ray.execution.context import (
     SecurityContext,
 )
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
+from tibios_ray.execution.report import ExecutionPhase
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
 from tibios_ray.transport.errors import (
@@ -267,3 +268,45 @@ def workload_id_from_pulse_request(message: worker_pb2.PulseRequest) -> Workload
 
     _require_field(message, "workload_id", qualified_name="PulseRequest.workload_id")
     return workload_id_from_wire(message.workload_id)
+
+
+# --- Outbound (domain -> wire): ExecutionPhase, ExecutionReport, ---
+# --- ExecutionEvent, ExecutionPulse (S3b, D16's closed lossiness list) ---
+
+_PHASE_TO_WIRE: Mapping[ExecutionPhase, int] = {
+    ExecutionPhase.RECEIVED: worker_pb2.EXECUTION_PHASE_RECEIVED,
+    ExecutionPhase.PREPARED: worker_pb2.EXECUTION_PHASE_PREPARED,
+    ExecutionPhase.RUNNING: worker_pb2.EXECUTION_PHASE_RUNNING,
+    ExecutionPhase.COMPLETED: worker_pb2.EXECUTION_PHASE_COMPLETED,
+    ExecutionPhase.FAILED: worker_pb2.EXECUTION_PHASE_FAILED,
+    ExecutionPhase.CANCELLED: worker_pb2.EXECUTION_PHASE_CANCELLED,
+}
+assert set(_PHASE_TO_WIRE) == set(ExecutionPhase), (
+    "_PHASE_TO_WIRE must exhaustively map every domain ExecutionPhase — "
+    "worker-wire-conversion: 'Every domain phase maps to a defined wire phase'"
+)
+
+
+def phase_to_wire(phase: ExecutionPhase) -> int:
+    """Domain `ExecutionPhase` -> wire `ExecutionPhase` enum int,
+    exhaustively mapped via `_PHASE_TO_WIRE`; `EXECUTION_PHASE_UNSPECIFIED`
+    is never produced (`worker-wire-conversion` — "Every domain phase maps
+    to a defined wire phase"). `_PHASE_TO_WIRE`'s key set is asserted equal
+    to `set(ExecutionPhase)` at import time, so this lookup can never
+    `KeyError` on a value from the real enum."""
+
+    return _PHASE_TO_WIRE[phase]
+
+
+def duration_to_wire(duration: timedelta, *, field: str) -> duration_pb2.Duration:
+    """Domain `timedelta` -> wire `google.protobuf.Duration`; a negative
+    duration raises `NegativeDurationError` (D9 Consequences — "Same
+    treatment for `ExecutionReport.duration` outbound"). The outbound
+    direction of the shared negative-duration check `duration_from_wire`
+    applies inbound, reused here for `ExecutionReport.duration`."""
+
+    if duration < timedelta(0):
+        raise NegativeDurationError(field)
+    result = duration_pb2.Duration()
+    result.FromTimedelta(duration)
+    return result

@@ -15,6 +15,7 @@ from tibios_ray.transport.errors import (
     EmptyCapabilityError,
     ErrorClass,
     InvalidObjectVersionError,
+    InvalidSequenceError,
     InvalidUlidError,
     MissingFieldError,
     NegativeDurationError,
@@ -54,12 +55,21 @@ class TestConversionErrorFamily:
             is ErrorClass.PERMANENT
         )
 
-    def test_all_five_subclasses_are_conversion_errors(self) -> None:
+    def test_invalid_sequence_error_classifies_permanent(self) -> None:
+        assert InvalidSequenceError("OutputChunk.sequence", -1).error_class is ErrorClass.PERMANENT
+
+    def test_all_six_subclasses_are_conversion_errors(self) -> None:
         assert issubclass(InvalidUlidError, ConversionError)
         assert issubclass(InvalidObjectVersionError, ConversionError)
         assert issubclass(MissingFieldError, ConversionError)
         assert issubclass(EmptyCapabilityError, ConversionError)
         assert issubclass(NegativeDurationError, ConversionError)
+        assert issubclass(InvalidSequenceError, ConversionError)
+
+    def test_invalid_sequence_error_names_the_field_and_value(self) -> None:
+        error = InvalidSequenceError("OutputChunk.sequence", -1)
+        assert "OutputChunk.sequence" in str(error)
+        assert "-1" in str(error)
 
     def test_missing_field_error_names_the_missing_field(self) -> None:
         error = MissingFieldError("ExecutionContext.allocation_contract")

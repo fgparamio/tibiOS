@@ -16,6 +16,7 @@ from google.protobuf import duration_pb2
 
 from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
+from tibios_ray.execution.report import ExecutionPhase
 from tibios_ray.testing.cancellation import ManualCancellation
 from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
@@ -583,3 +584,58 @@ class TestNoConversionPathPanics:
             )
         else:
             pytest.fail("expected conversion to raise ConversionError, but it succeeded")
+
+
+# --- S3b — Outbound Conversion (Event/Report/Pulse) + D16 Lossiness ---
+
+
+class TestPhaseToWire:
+    """3b.1 — `worker-wire-conversion`: "Every domain phase maps to a
+    defined wire phase"."""
+
+    @pytest.mark.parametrize(
+        ("phase", "expected"),
+        [
+            (ExecutionPhase.RECEIVED, worker_pb2.EXECUTION_PHASE_RECEIVED),
+            (ExecutionPhase.PREPARED, worker_pb2.EXECUTION_PHASE_PREPARED),
+            (ExecutionPhase.RUNNING, worker_pb2.EXECUTION_PHASE_RUNNING),
+            (ExecutionPhase.COMPLETED, worker_pb2.EXECUTION_PHASE_COMPLETED),
+            (ExecutionPhase.FAILED, worker_pb2.EXECUTION_PHASE_FAILED),
+            (ExecutionPhase.CANCELLED, worker_pb2.EXECUTION_PHASE_CANCELLED),
+        ],
+    )
+    def test_every_domain_phase_maps_to_a_defined_wire_phase(
+        self, phase: ExecutionPhase, expected: int
+    ) -> None:
+        from tibios_ray.transport.convert import phase_to_wire
+
+        result = phase_to_wire(phase)
+
+        assert result == expected
+        assert result != worker_pb2.EXECUTION_PHASE_UNSPECIFIED
+
+    def test_phase_to_wire_key_set_equals_every_domain_phase(self) -> None:
+        from tibios_ray.transport.convert import _PHASE_TO_WIRE
+
+        assert set(_PHASE_TO_WIRE) == set(ExecutionPhase)
+
+
+class TestDurationToWire:
+    """3b.2 — outbound direction of D9's negative-`Duration` rejection
+    (D9 Consequences — "Same treatment for `ExecutionReport.duration`
+    outbound")."""
+
+    def test_positive_timedelta_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import duration_to_wire
+
+        result = duration_to_wire(timedelta(seconds=5), field="test")
+
+        assert result.ToTimedelta() == timedelta(seconds=5)
+
+    def test_negative_timedelta_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import duration_to_wire
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            duration_to_wire(timedelta(seconds=-1), field="ExecutionReport.duration")
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+        assert "ExecutionReport.duration" in str(excinfo.value)
