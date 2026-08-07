@@ -94,7 +94,7 @@ class ExecutionContext:
 
     capability: str
     allocation_contract: AllocationContract
-    dependencies: Mapping[str, ResolvedModelRef]
+    dependencies: tuple[ResolvedModelRef, ...]
     security_context: SecurityContext
     observability_context: ObservabilityContext
     execution_parameters: Mapping[str, str]

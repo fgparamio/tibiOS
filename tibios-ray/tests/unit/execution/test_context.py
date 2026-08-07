@@ -87,12 +87,13 @@ def _context(
     security_context: SecurityContext | None = None,
     observability_context: ObservabilityContext | None = None,
     execution_parameters: dict[str, str] | None = None,
+    dependencies: tuple[ResolvedModelRef, ...] = (),
     channel: InMemoryExecutionChannel | None = None,
 ) -> ExecutionContext:
     return ExecutionContext(
         capability=capability,
         allocation_contract=_allocation_contract(),
-        dependencies={},
+        dependencies=dependencies,
         security_context=security_context or _default_security_context(),
         observability_context=observability_context or _default_observability_context(),
         execution_parameters=execution_parameters if execution_parameters is not None else {},
@@ -157,6 +158,29 @@ class TestExecutionParametersDispatchIndependence:
         assert first_report.trace_id == second_report.trace_id
         assert first.execution_parameters == {}
         assert second.execution_parameters == {"temperature": "0.7", "top_p": "0.9"}
+
+
+class TestDependenciesIsOrderedAndUnkeyed:
+    def test_accepts_a_tuple_and_preserves_construction_order(self) -> None:
+        # D10: dependencies is ordered, unkeyed — the wire is `repeated
+        # ResolvedModelRef` with no key, and fabricating one is exactly
+        # what worker-wire-conversion's reject-don't-guess rule forbids.
+        first_ref = ResolvedModelRef(
+            object_id=ObjectId("01J0000000000000000000000"),
+            version=ObjectVersion(1),
+            content_hash=ContentHash("sha256:first"),
+        )
+        second_ref = ResolvedModelRef(
+            object_id=ObjectId("01J0000000000000000000001"),
+            version=ObjectVersion(1),
+            content_hash=ContentHash("sha256:second"),
+        )
+
+        ctx = _context(dependencies=(first_ref, second_ref))
+
+        assert ctx.dependencies == (first_ref, second_ref)
+        assert ctx.dependencies[0] is first_ref
+        assert ctx.dependencies[1] is second_ref
 
 
 class TestResolvedModelRef:
