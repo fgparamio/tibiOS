@@ -90,7 +90,7 @@ Compile time matters — avoid unnecessary dependencies, macros, and deeply nest
 
 Unsafe does not automatically improve performance. Use unsafe only when measurement proves its value — every unsafe optimization requires benchmarks.
 
-> This directly applies to the `local-infer` crate's choice of `llama.cpp` bindings (unsafe FFI) over `candle` (pure Rust): the choice must eventually be validated with real benchmarks, not intuition alone, once code exists.
+> This directly applies to the `local-infer` module's choice of `llama.cpp` bindings (unsafe FFI) over `candle` (pure Rust): the choice must eventually be validated with real benchmarks, not intuition alone, once code exists.
 
 ## Review Checklist
 

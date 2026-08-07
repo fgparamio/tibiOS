@@ -94,6 +94,18 @@ pub(super) fn build_local_infer_worker() -> LocalInferWorker {
     LocalInferWorker::new()
 }
 
+/// Test-only counterpart to `build_local_infer_worker()` for `any.rs`'s
+/// `--features llamacpp` conformance suite: under that feature,
+/// `default_engine()` needs an operator-supplied GGUF model
+/// (`TIBIOS_LOCAL_INFER_MODEL_PATH`) that CI does not provide, so the O1-O4
+/// harness runs against the deterministic reference engine instead —
+/// keeping `worker-inbound-port`'s "invoked ≥3 times, none skipped"
+/// guarantee true under every feature set (`worker-inbound-port/spec.md`).
+#[cfg(all(test, feature = "llamacpp"))]
+pub(super) fn local_infer_worker_with_deterministic_engine() -> LocalInferWorker {
+    LocalInferWorker::with_engine(engine::deterministic_engine_for_tests())
+}
+
 impl WorkerService for LocalInferWorker {
     /// Not an `async fn`: O1/O4 registration happens synchronously in this
     /// function body, before the returned future is ever polled (mirrors
