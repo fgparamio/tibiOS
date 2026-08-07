@@ -1,20 +1,6 @@
-# Object Domain Specification
+# Delta for runtime-object
 
-## Purpose
-
-`runtime-object` is the Object domain's data family — `ObjectType`, `ObjectLifecycle`, `LogicalObject`, `ContentObject` — implementing `13-object-model.md` and `23-object-store.md`. No Ports yet — `ObjectStore` and resolution are a future change.
-
-## Requirements
-
-### Requirement: Exhaustive Dependency Set
-
-`runtime-object` MUST depend on exactly `runtime-primitives` among workspace crates, and on no other workspace crate.
-
-#### Scenario: Only primitives is a workspace dependency
-
-- GIVEN `runtime-object/Cargo.toml`
-- WHEN `cargo metadata` is inspected
-- THEN its only workspace-crate dependency is `runtime-primitives`
+## MODIFIED Requirements
 
 ### Requirement: runtime-object Exposes A Data Family, Still No Public Traits
 
@@ -33,6 +19,8 @@
 - GIVEN `runtime-object/src/lib.rs`
 - WHEN its crate doc comment is read
 - THEN it references both `13-object-model.md` and `23-object-store.md`
+
+## ADDED Requirements
 
 ### Requirement: ObjectType Is A Closed Enum Naming The Ten Object Categories
 
