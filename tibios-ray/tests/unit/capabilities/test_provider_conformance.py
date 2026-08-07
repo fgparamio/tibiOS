@@ -8,8 +8,9 @@ the static conformance check: `CapabilityProvider` is a `typing.Protocol`,
 not `runtime_checkable`, so no `isinstance` check against it is possible
 (design.md, CP7).
 
-`_WIRED_PROVIDER_TYPES` (currently just `ChatProvider`; `EmbeddingProvider`
-and `RerankProvider` join in Slice 5) is the split point this slice
+`_WIRED_PROVIDER_TYPES` (`ChatProvider`, `EmbeddingProvider`, and
+`RerankProvider` — Slice 5 completes the parameterization Slice 4
+started with `ChatProvider` alone) is the split point this slice
 introduces: a wired Provider declares two injected fields instead of
 zero (D18) and no longer raises `NoBackendAvailableError`
 unconditionally (`capability-providers` spec: "No-Backend Execution
@@ -33,12 +34,12 @@ import pytest
 from tibios_ray.backends.adapter import BackendId
 from tibios_ray.capabilities.chat import CHAT_GENERATE_DESCRIPTOR, ChatProvider
 from tibios_ray.capabilities.descriptor import ModelFamily
-from tibios_ray.capabilities.embedding import EmbeddingProvider
+from tibios_ray.capabilities.embedding import EMBEDDING_GENERATE_DESCRIPTOR, EmbeddingProvider
 from tibios_ray.capabilities.errors import NoBackendAvailableError
 from tibios_ray.capabilities.names import CapabilityName
 from tibios_ray.capabilities.ocr import OcrProvider
 from tibios_ray.capabilities.provider import CapabilityProvider
-from tibios_ray.capabilities.rerank import RerankProvider
+from tibios_ray.capabilities.rerank import RERANK_DOCUMENTS_DESCRIPTOR, RerankProvider
 from tibios_ray.capabilities.speech import SpeechSynthesisProvider, SpeechTranscriptionProvider
 from tibios_ray.capabilities.vision import VisionProvider
 from tibios_ray.execution.context import ExecutionContext, ResolvedModelRef
@@ -49,14 +50,20 @@ from tibios_ray.runtime.registry import CapabilityRegistry
 from tibios_ray.runtime.worker_runtime import WorkerRuntime
 from tibios_ray.selection.policy import Quantization, ServingPlan
 from tibios_ray.testing import (
+    FakeEmbeddingBackend,
     FakeExecutionContext,
     FakeModelSelectionPolicy,
+    FakeRerankBackend,
     FakeTextBackend,
     InMemoryExecutionChannel,
     ManualCancellation,
 )
 
-_WIRED_PROVIDER_TYPES: tuple[type[CapabilityProvider], ...] = (ChatProvider,)
+_WIRED_PROVIDER_TYPES: tuple[type[CapabilityProvider], ...] = (
+    ChatProvider,
+    EmbeddingProvider,
+    RerankProvider,
+)
 
 
 def _model_ref(suffix: str = "1") -> ResolvedModelRef:
@@ -75,8 +82,8 @@ _UNRESOLVED_POLICY = FakeModelSelectionPolicy(
 
 _PROVIDERS: tuple[CapabilityProvider, ...] = (
     ChatProvider(backends={}, selection_policy=_UNRESOLVED_POLICY),
-    EmbeddingProvider(),
-    RerankProvider(),
+    EmbeddingProvider(backends={}, selection_policy=_UNRESOLVED_POLICY),
+    RerankProvider(backends={}, selection_policy=_UNRESOLVED_POLICY),
     VisionProvider(),
     SpeechTranscriptionProvider(),
     SpeechSynthesisProvider(),
@@ -300,6 +307,106 @@ class TestChatProviderDispatchSplit:
             selection_policy=FakeModelSelectionPolicy(plan=plan),
         )
         context = self._chat_context()
+
+        report = asyncio.run(provider.execute(context))
+
+        assert report.phase == ExecutionPhase.COMPLETED
+
+
+class TestEmbeddingProviderDispatchSplit:
+    """`EmbeddingProvider`'s half of the
+    `test_execute_always_raises_no_backend_available_error` split (Test
+    Impact table, row 2; task 5.8) — completes the split started by
+    `TestChatProviderDispatchSplit` in Slice 4. Full dispatch behavior
+    (release guarantee, cancellation, the embedding codec) is
+    `test_embedding.py`'s job — this only proves the raise is no longer
+    unconditional."""
+
+    @staticmethod
+    def _embedding_context() -> ExecutionContext:
+        return FakeExecutionContext(
+            capability=EMBEDDING_GENERATE_DESCRIPTOR.capability.value,
+            execution_parameters={"inputs": '["hello"]'},
+            dependencies=(_model_ref(),),
+        )
+
+    def test_empty_mapping_still_raises_no_backend_available_error(self) -> None:
+        provider = EmbeddingProvider(backends={}, selection_policy=_UNRESOLVED_POLICY)
+        context = self._embedding_context()
+
+        async def scenario() -> None:
+            await provider.execute(context)
+
+        with pytest.raises(NoBackendAvailableError) as exc_info:
+            asyncio.run(scenario())
+
+        error = exc_info.value
+        assert error.capability == provider.descriptor.capability
+        assert error.provider == "EmbeddingProvider"
+
+    def test_non_empty_resolving_mapping_dispatches_instead_of_raising(self) -> None:
+        backend_id = BackendId("onnxruntime")
+        backend = FakeEmbeddingBackend(backend_id)
+        plan = ServingPlan(
+            model=_model_ref(),
+            backend=backend_id,
+            quantization=Quantization(scheme="artifact-defined", bits=0),
+        )
+        provider = EmbeddingProvider(
+            backends={backend_id: backend},
+            selection_policy=FakeModelSelectionPolicy(plan=plan),
+        )
+        context = self._embedding_context()
+
+        report = asyncio.run(provider.execute(context))
+
+        assert report.phase == ExecutionPhase.COMPLETED
+
+
+class TestRerankProviderDispatchSplit:
+    """`RerankProvider`'s half of the
+    `test_execute_always_raises_no_backend_available_error` split (Test
+    Impact table, row 2; task 5.8) — completes the split started by
+    `TestChatProviderDispatchSplit` in Slice 4. Full dispatch behavior
+    (release guarantee, cancellation, the rerank codec) is
+    `test_rerank.py`'s job — this only proves the raise is no longer
+    unconditional."""
+
+    @staticmethod
+    def _rerank_context() -> ExecutionContext:
+        return FakeExecutionContext(
+            capability=RERANK_DOCUMENTS_DESCRIPTOR.capability.value,
+            execution_parameters={"query": "hello", "documents": '["doc a"]'},
+            dependencies=(_model_ref(),),
+        )
+
+    def test_empty_mapping_still_raises_no_backend_available_error(self) -> None:
+        provider = RerankProvider(backends={}, selection_policy=_UNRESOLVED_POLICY)
+        context = self._rerank_context()
+
+        async def scenario() -> None:
+            await provider.execute(context)
+
+        with pytest.raises(NoBackendAvailableError) as exc_info:
+            asyncio.run(scenario())
+
+        error = exc_info.value
+        assert error.capability == provider.descriptor.capability
+        assert error.provider == "RerankProvider"
+
+    def test_non_empty_resolving_mapping_dispatches_instead_of_raising(self) -> None:
+        backend_id = BackendId("onnxruntime")
+        backend = FakeRerankBackend(backend_id)
+        plan = ServingPlan(
+            model=_model_ref(),
+            backend=backend_id,
+            quantization=Quantization(scheme="artifact-defined", bits=0),
+        )
+        provider = RerankProvider(
+            backends={backend_id: backend},
+            selection_policy=FakeModelSelectionPolicy(plan=plan),
+        )
+        context = self._rerank_context()
 
         report = asyncio.run(provider.execute(context))
 
