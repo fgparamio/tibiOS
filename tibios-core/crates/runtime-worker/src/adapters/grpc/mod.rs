@@ -5,3 +5,4 @@
 include!(concat!(env!("OUT_DIR"), "/tibios_worker_grpc.rs"));
 
 mod convert;
+mod ray_worker;

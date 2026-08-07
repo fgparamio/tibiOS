@@ -222,6 +222,28 @@ impl ExecutionContext {
         self.workload_id
     }
 
+    /// The identity of the Allocation this execution runs under — additive,
+    /// read-only access, mirroring `workload_id`'s own accessor shape.
+    #[must_use]
+    pub const fn allocation_id(&self) -> AllocationId {
+        self.allocation_id
+    }
+
+    /// The already-resolved dependency references carried by this context —
+    /// additive, read-only access.
+    #[must_use]
+    pub fn dependencies(&self) -> &[ResolvedDependency] {
+        &self.dependencies
+    }
+
+    /// The carried, uninterpreted authorization envelope — additive,
+    /// read-only access, mirroring `observability_context`'s own accessor
+    /// shape.
+    #[must_use]
+    pub const fn security_context(&self) -> &SecurityContext {
+        &self.security_context
+    }
+
     /// The carried tracing identifiers for this execution — additive,
     /// read-only access so a `WorkerService` implementation can attach them
     /// to the `ExecutionReport` it owes (`worker-composition-root/design.md`

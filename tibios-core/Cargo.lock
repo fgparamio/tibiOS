@@ -1055,6 +1055,7 @@ dependencies = [
  "runtime-object",
  "runtime-primitives",
  "sha2",
+ "tokio",
  "tonic",
  "tonic-build",
 ]

@@ -24,6 +24,8 @@
 //! public `runtime_primitives::Classify` trait directly; no private copy
 //! of that trait is defined in this crate.
 
+use runtime_primitives::Classify;
+
 use super::tibios::{primitives::v1 as identity_proto, worker::v1 as worker_proto};
 
 /// The wire's `google.protobuf.Duration`, compiled locally
@@ -106,6 +108,22 @@ impl runtime_primitives::Classify for ConversionError {
             | Self::UnsetExecutionResponseOneof
             | Self::UnspecifiedExecutionPhase
             | Self::NegativeDuration => runtime_primitives::ErrorClass::Permanent,
+        }
+    }
+}
+
+/// A `ConversionError` (rejected wire content, e.g. mid-stream on
+/// `SubmitJob`'s response) is itself a `WorkerError::Transport` — the
+/// classification `Classify` already assigns it (`Permanent`, every
+/// variant) becomes the `Transport` variant's `kind`, and `Display`'s
+/// output becomes the carried `message`. `RayWorker::execute` relies on
+/// this to turn a malformed `ExecutionResponse` frame into the same error
+/// shape every other transport failure produces.
+impl From<ConversionError> for crate::error::WorkerError {
+    fn from(error: ConversionError) -> Self {
+        Self::Transport {
+            kind: error.classify(),
+            message: error.to_string(),
         }
     }
 }
@@ -306,6 +324,79 @@ impl From<worker_proto::ObservabilityContext> for crate::execution::context::Obs
     }
 }
 
+/// Converts a `core::time::Duration` into the wire's `google.protobuf.Duration`.
+/// Infallible: every `Duration` value is representable (`seconds`/`nanos` are
+/// both non-negative by construction). The reverse of `duration_from_proto`.
+fn duration_to_proto(value: core::time::Duration) -> WireDuration {
+    WireDuration {
+        seconds: value.as_secs() as i64,
+        nanos: value.subsec_nanos() as i32,
+    }
+}
+
+impl From<runtime_allocation::AllocationContract> for worker_proto::AllocationContract {
+    fn from(value: runtime_allocation::AllocationContract) -> Self {
+        Self {
+            max_execution_duration: Some(duration_to_proto(value.max_execution_duration())),
+        }
+    }
+}
+
+impl From<crate::execution::context::ResolvedDependency> for worker_proto::ResolvedModelRef {
+    fn from(value: crate::execution::context::ResolvedDependency) -> Self {
+        Self {
+            object_id: Some(value.object_id().into()),
+            object_version: Some(value.object_version().into()),
+            content_hash: Some(value.content_hash().clone().into()),
+        }
+    }
+}
+
+impl From<crate::execution::context::SecurityContext> for worker_proto::SecurityContext {
+    fn from(value: crate::execution::context::SecurityContext) -> Self {
+        Self {
+            tenant_id: value.tenant_id().to_string(),
+            principal_id: value.principal_id().to_string(),
+            grant_scope: value.grant_scope().to_vec(),
+        }
+    }
+}
+
+impl From<crate::execution::context::ObservabilityContext> for worker_proto::ObservabilityContext {
+    fn from(value: crate::execution::context::ObservabilityContext) -> Self {
+        Self {
+            trace_id: value.trace_id().to_string(),
+            span_id: value.span_id().to_string(),
+        }
+    }
+}
+
+impl From<crate::execution::context::ExecutionContext> for worker_proto::ExecutionContext {
+    fn from(value: crate::execution::context::ExecutionContext) -> Self {
+        Self {
+            workload_id: Some(value.workload_id().into()),
+            allocation_id: Some(value.allocation_id().into()),
+            allocation_contract: Some(value.allocation_contract().into()),
+            dependencies: value
+                .dependencies()
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect(),
+            security_context: Some(value.security_context().clone().into()),
+            observability_context: Some(value.observability_context().clone().into()),
+            execution_parameters: value.execution_parameters().clone().into_iter().collect(),
+            worker_capability: Some(value.worker_capability().clone().into()),
+        }
+    }
+}
+
+impl From<worker_proto::CancelAck> for crate::execution::report::CancelAck {
+    fn from(_value: worker_proto::CancelAck) -> Self {
+        Self
+    }
+}
+
 impl TryFrom<worker_proto::ExecutionContext> for crate::execution::context::ExecutionContext {
     type Error = ConversionError;
 
@@ -471,16 +562,20 @@ impl TryFrom<worker_proto::ExecutionPulse> for crate::execution::report::Executi
 /// adapter-only routing, exactly the case `worker-wire-adapter/spec.md`'s
 /// "no local mirror" requirement carves out (`tasks.md` 5a.3).
 ///
-/// `dead_code` is narrowly allowed on this one item (not at module scope —
-/// `tasks.md` 5a.16): a future phase wires the actual `WorkerExecution`
-/// RPCs and consumes this type (out of scope for this slice); today it is
-/// exercised only by this module's own unit tests, which does not count as
-/// "used" for a plain (non-test) library build. Every other conversion in
-/// this file is exercised outside `#[cfg(test)]` too (as trait impls
-/// callable by any future consumer), so no other item needs this allow.
+/// `pub(super)`: `RayWorker::execute` (`adapters/grpc/ray_worker.rs`, a
+/// sibling module under `grpc`) routes `SubmitJob` response frames through
+/// this type. Still confined to the `grpc` subtree — never `pub` — so it
+/// stays outside this crate's public surface.
+///
+/// `dead_code` is allowed here (not at module scope): `RayWorker` is this
+/// type's real caller, and `RayWorker` itself is only reachable from
+/// `runtime`'s Composition Root (a later phase of
+/// `worker-grpc-client-adapter`, out of scope for this slice) — so this
+/// type is unreachable in a plain (non-test) library build until that
+/// wiring lands, even though `ray_worker.rs` already calls it.
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
-enum ResponseFrame {
+pub(super) enum ResponseFrame {
     Event(crate::execution::event::ExecutionEvent),
     Report(crate::execution::report::ExecutionReport),
 }
@@ -499,12 +594,70 @@ impl TryFrom<worker_proto::ExecutionResponse> for ResponseFrame {
     }
 }
 
+impl crate::error::WorkerError {
+    /// Maps a `tonic::Status` into a `WorkerError`, per design.md D5.
+    /// `NotFound`/`AlreadyExists` reuse the existing correlation-failure
+    /// variants — which is why this takes `workload_id` rather than being a
+    /// plain `From<tonic::Status>` impl: a bare `Status` carries no
+    /// correlation of its own, only the call site (which already knows the
+    /// `WorkloadId` it made the RPC for) does. Every other code becomes
+    /// `Transport`, classified by `transport_kind`. Defined here rather
+    /// than in `error.rs` because this crate's architecture guard forbids
+    /// any `tonic::` token outside the private adapter module.
+    ///
+    /// `dead_code` is allowed here (not at module scope): `RayWorker`
+    /// (`adapters/grpc/ray_worker.rs`) is this function's real caller, but
+    /// `RayWorker` itself awaits Composition-Root wiring (a later phase,
+    /// out of scope for this slice), so this stays unreachable in a plain
+    /// (non-test) library build until then.
+    #[allow(dead_code)]
+    pub(crate) fn from_status(
+        status: tonic::Status,
+        workload_id: runtime_primitives::WorkloadId,
+    ) -> Self {
+        match status.code() {
+            tonic::Code::NotFound => Self::UnknownWorkload(workload_id),
+            tonic::Code::AlreadyExists => Self::DuplicateWorkload(workload_id),
+            code => Self::Transport {
+                kind: transport_kind(code),
+                message: status.message().to_string(),
+            },
+        }
+    }
+}
+
+/// Buckets a `tonic::Code` into `Transient`/`Permanent` per design.md D5's
+/// table. A code the table does not name (e.g. `Cancelled`) defaults to
+/// `Permanent`: retry-looping an unrecognized rejection is worse than giving
+/// up once on it.
+///
+/// `dead_code` is allowed here (not at module scope): `from_status` is this
+/// function's only caller, and `from_status` is itself unreachable outside
+/// `#[cfg(test)]` until `RayWorker` is wired into the Composition Root (a
+/// later phase, out of scope for this slice).
+#[allow(dead_code)]
+fn transport_kind(code: tonic::Code) -> runtime_primitives::ErrorClass {
+    use tonic::Code;
+    match code {
+        Code::Unavailable
+        | Code::DeadlineExceeded
+        | Code::Aborted
+        | Code::ResourceExhausted
+        | Code::Unknown => runtime_primitives::ErrorClass::Transient,
+        _ => runtime_primitives::ErrorClass::Permanent,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ConversionError, ResponseFrame, WireDuration, identity_proto, worker_proto};
-    use crate::execution::context::{ExecutionContext, WorkerCapability};
+    use crate::error::WorkerError;
+    use crate::execution::context::{
+        ExecutionContext, ObservabilityContext, ResolvedDependency, SecurityContext,
+        WorkerCapability,
+    };
     use crate::execution::event::{CheckpointCreated, ExecutionEvent};
-    use crate::execution::report::ExecutionPhase;
+    use crate::execution::report::{CancelAck, ExecutionPhase};
     use runtime_allocation::AllocationContract;
     use runtime_primitives::{
         AllocationId, Classify, ContentHash, ErrorClass, ObjectId, ObjectVersion, WorkloadId,
@@ -916,6 +1069,154 @@ mod tests {
             Err(ConversionError::MissingField("worker_capability"))
         );
         assert_eq!(result.unwrap_err().classify(), ErrorClass::Permanent);
+    }
+
+    #[test]
+    fn execution_context_domain_to_wire_round_trips_every_field() {
+        let workload_id = WorkloadId::new();
+        let allocation_id = AllocationId::new();
+        let allocation_contract = AllocationContract::new(core::time::Duration::from_secs(30));
+        let object_id = ObjectId::new();
+        let object_version = ObjectVersion::from_u64(3);
+        let content_hash = ContentHash::new("sha256:af23");
+        let dependency = ResolvedDependency::new(object_id, object_version, content_hash.clone());
+        let mut execution_parameters = std::collections::BTreeMap::new();
+        execution_parameters.insert("temperature".to_string(), "0.7".to_string());
+
+        let original = ExecutionContext::new(
+            workload_id,
+            allocation_id,
+            allocation_contract,
+            vec![dependency],
+            SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
+            ObservabilityContext::new("trace-1", "span-1"),
+            execution_parameters.clone(),
+            WorkerCapability::new("chat.generate"),
+        );
+
+        let wire: worker_proto::ExecutionContext = original.clone().into();
+
+        assert_eq!(
+            wire.workload_id.as_ref().unwrap().value,
+            workload_id.to_string()
+        );
+        assert_eq!(
+            wire.allocation_id.as_ref().unwrap().value,
+            allocation_id.to_string()
+        );
+        assert_eq!(
+            wire.allocation_contract
+                .as_ref()
+                .unwrap()
+                .max_execution_duration
+                .as_ref()
+                .unwrap()
+                .seconds,
+            30
+        );
+        assert_eq!(wire.dependencies.len(), 1);
+        assert_eq!(
+            wire.dependencies[0].object_id.as_ref().unwrap().value,
+            object_id.to_string()
+        );
+        assert_eq!(
+            wire.dependencies[0].content_hash.as_ref().unwrap().value,
+            content_hash.digest().to_string()
+        );
+        let security = wire.security_context.as_ref().unwrap();
+        assert_eq!(security.tenant_id, "tenant-1");
+        assert_eq!(security.principal_id, "principal-1");
+        assert_eq!(security.grant_scope, vec!["scope-a".to_string()]);
+        let observability = wire.observability_context.as_ref().unwrap();
+        assert_eq!(observability.trace_id, "trace-1");
+        assert_eq!(observability.span_id, "span-1");
+        assert_eq!(
+            wire.execution_parameters.get("temperature"),
+            Some(&"0.7".to_string())
+        );
+        assert_eq!(
+            wire.worker_capability.as_ref().unwrap().value,
+            "chat.generate"
+        );
+
+        let round_tripped = ExecutionContext::try_from(wire).unwrap();
+        assert_eq!(round_tripped, original);
+    }
+
+    #[test]
+    fn cancel_ack_wire_to_domain_always_succeeds() {
+        let wire = worker_proto::CancelAck {};
+        let domain: CancelAck = wire.into();
+        assert_eq!(domain, CancelAck);
+    }
+
+    #[test]
+    fn status_not_found_and_already_exists_map_to_existing_correlation_variants() {
+        let workload_id = WorkloadId::new();
+
+        let not_found = tonic::Status::not_found("no such workload");
+        assert_eq!(
+            WorkerError::from_status(not_found, workload_id),
+            WorkerError::UnknownWorkload(workload_id)
+        );
+
+        let already_exists = tonic::Status::already_exists("already running");
+        assert_eq!(
+            WorkerError::from_status(already_exists, workload_id),
+            WorkerError::DuplicateWorkload(workload_id)
+        );
+    }
+
+    #[test]
+    fn every_other_tonic_code_classifies_per_d5_table() {
+        use tonic::Code;
+
+        let workload_id = WorkloadId::new();
+        let transient_codes = [
+            Code::Unavailable,
+            Code::DeadlineExceeded,
+            Code::Aborted,
+            Code::ResourceExhausted,
+            Code::Unknown,
+        ];
+        let permanent_codes = [
+            Code::InvalidArgument,
+            Code::PermissionDenied,
+            Code::Unauthenticated,
+            Code::FailedPrecondition,
+            Code::OutOfRange,
+            Code::Unimplemented,
+            Code::Internal,
+            Code::DataLoss,
+        ];
+
+        for code in transient_codes {
+            let status = tonic::Status::new(code, "transient condition");
+            let error = WorkerError::from_status(status, workload_id);
+            assert!(matches!(error, WorkerError::Transport { .. }));
+            assert_eq!(error.classify(), ErrorClass::Transient);
+        }
+
+        for code in permanent_codes {
+            let status = tonic::Status::new(code, "permanent condition");
+            let error = WorkerError::from_status(status, workload_id);
+            assert!(matches!(error, WorkerError::Transport { .. }));
+            assert_eq!(error.classify(), ErrorClass::Permanent);
+        }
+    }
+
+    #[test]
+    fn transport_error_carries_the_status_message_and_no_transport_type() {
+        let workload_id = WorkloadId::new();
+        let status = tonic::Status::unavailable("connection refused");
+        let error = WorkerError::from_status(status, workload_id);
+        match error {
+            WorkerError::Transport { message, kind } => {
+                assert!(message.contains("connection refused"));
+                assert_eq!(kind, ErrorClass::Transient);
+            }
+            _ => panic!("expected Transport variant"),
+        }
     }
 
     #[test]

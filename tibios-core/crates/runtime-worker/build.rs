@@ -37,7 +37,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", manifest.display());
 
     tonic_build::configure()
-        .build_server(false)
+        .build_server(true)
         // Compile the well-known types (`google.protobuf.Duration`, used by
         // `worker.proto`) locally instead of depending on the `prost-types`
         // crate — `runtime-worker`'s external allowlist stays exactly

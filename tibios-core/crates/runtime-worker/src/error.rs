@@ -16,7 +16,7 @@ use crate::ports::execution_channel::ChannelClosed;
 /// conversion a Worker can reach for after a failed `ExecutionChannel::emit`
 /// (`ports/execution_channel.rs`); it grows as further obligations are added
 /// to the port.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkerError {
     /// `cancel`/`pulse` was called for a `WorkloadId` this Worker has no
     /// in-flight registration for. Returned whether the id never existed
@@ -39,6 +39,19 @@ pub enum WorkerError {
     /// doc comment, design.md D9 Consequences) — it only makes one
     /// available.
     ChannelClosed(ChannelClosed),
+    /// A gRPC transport-level failure (connection refused, deadline
+    /// exceeded, a rejected request, ...) normalized away from `tonic`'s own
+    /// type (`worker-inbound-port/spec.md` — "WorkerError Normalizes
+    /// Transport Failures Without Naming A Transport Type"). `kind` is the
+    /// classification this specific condition maps to per D5's table, not a
+    /// blanket constant — see `from_status`.
+    Transport {
+        /// The classification this specific transport condition maps to,
+        /// resolved once at construction time by `from_status`.
+        kind: ErrorClass,
+        /// The status message carried by the transport failure, verbatim.
+        message: String,
+    },
 }
 
 impl core::fmt::Display for WorkerError {
@@ -51,6 +64,7 @@ impl core::fmt::Display for WorkerError {
                 write!(f, "an execution is already registered for {workload_id}")
             }
             Self::ChannelClosed(cause) => write!(f, "{cause}"),
+            Self::Transport { message, .. } => write!(f, "transport failure: {message}"),
         }
     }
 }
@@ -68,6 +82,10 @@ impl Classify for WorkerError {
             // retried `execute` call gets a fresh `ExecutionChannel` from
             // the Runtime, so retrying can resolve it.
             Self::ChannelClosed(_) => ErrorClass::Transient,
+            // Precomputed at construction time by `from_status`, per
+            // condition — never a blanket classification for every
+            // transport failure alike.
+            Self::Transport { kind, .. } => *kind,
         }
     }
 }
@@ -77,6 +95,14 @@ impl From<ChannelClosed> for WorkerError {
         Self::ChannelClosed(cause)
     }
 }
+
+// The `tonic::Status` -> `WorkerError` mapping (design.md D5) lives in
+// `adapters/grpc/convert.rs`, not here: this crate's architecture guard
+// (`runtime_worker_transport_types_stay_inside_the_private_adapter_module`)
+// forbids any `tonic::`/`prost::` token outside the private adapter module,
+// and `error.rs` is not part of it. `WorkerError::from_status` is still
+// reachable as `WorkerError::from_status(..)` from there — the `impl
+// WorkerError` block granting it lives in `convert.rs`, in the same crate.
 
 #[cfg(test)]
 mod tests {
@@ -124,5 +150,29 @@ mod tests {
     fn from_channel_closed_wraps_it_in_the_channel_closed_variant() {
         let error: WorkerError = ChannelClosed.into();
         assert_eq!(error, WorkerError::ChannelClosed(ChannelClosed));
+    }
+
+    #[test]
+    fn transport_variant_display_carries_the_message() {
+        let error = WorkerError::Transport {
+            kind: ErrorClass::Transient,
+            message: "connection refused".to_string(),
+        };
+        assert!(format!("{error}").contains("connection refused"));
+    }
+
+    #[test]
+    fn transport_variant_classifies_by_its_stored_kind() {
+        let transient = WorkerError::Transport {
+            kind: ErrorClass::Transient,
+            message: String::new(),
+        };
+        assert_eq!(transient.classify(), ErrorClass::Transient);
+
+        let permanent = WorkerError::Transport {
+            kind: ErrorClass::Permanent,
+            message: String::new(),
+        };
+        assert_eq!(permanent.classify(), ErrorClass::Permanent);
     }
 }
