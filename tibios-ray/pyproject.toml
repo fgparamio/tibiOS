@@ -15,6 +15,24 @@ tibios-ray = "tibios_ray:main"
 
 [project.optional-dependencies]
 llamacpp = ["llama-cpp-python>=0.3.34,<0.4"]
+# vllm pulls in a GB-scale, CUDA/torch-pinned wheel — heavier than
+# llamacpp's extra above (design.md "Risks"). The unit test tier must
+# never require this extra to be installed (`engines/vllm.py`'s lazy
+# `importlib` seam, design decision VL8/LC11).
+# `python_version < '3.14'` marker: vllm pins torch==2.7.0, which
+# ships no cp314 wheel, and `requires-python = ">=3.14"` is project-wide
+# — without this marker, `uv lock`/`uv sync`/`uv run` fail to resolve
+# for *everyone*, including the SDK-free unit tier that never touches
+# vllm at all. Revisit (drop the marker) once upstream torch/vllm ship
+# a cp314 build; a real GPU install today targets a <3.14 interpreter
+# for this extra specifically.
+vllm = ["vllm>=0.9.0,<0.10; python_version < '3.14'"]
+# Two artifacts, one debt (design.md OR10): `model_path` and
+# `tokenizer_path` ship as separate construction arguments with nothing
+# here verifying they are a matched pair — discharged by a future
+# change that resolves `ResolvedModelRef` into an atomic artifact
+# bundle, not by this extra.
+onnx = ["onnxruntime>=1.20.0", "transformers>=4.46.0"]
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]

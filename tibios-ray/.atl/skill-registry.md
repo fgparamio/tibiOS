@@ -32,9 +32,11 @@ attribution, no build-after-changes, rg/fd/bat/sd/eza over grep/find/cat/sed/ls)
 
 No Python-specific user skill installed. Test runner: `pytest>=9.1.1` (dev dependency,
 `uv run pytest`). **Strict TDD Mode is ACTIVE (permanently enabled by user preference)** —
-every `sdd-apply`/`sdd-verify` in this project must run in Strict TDD Mode. `ruff` and
-`pyright` are not installed yet (tracked under the still-unapplied `python-foundation`
-change) — do not scaffold them speculatively ahead of that change.
+every `sdd-apply`/`sdd-verify` in this project must run in Strict TDD Mode. `ruff>=0.16.1`
+and `pyright>=1.1.411` are dev dependencies as of 2026-08-06 (confirmed in `pyproject.toml`;
+the `python-foundation` change landed them) — local gate is
+`uv run pytest && uv run ruff check && uv run pyright`. No CI workflow exists yet
+(`.github/workflows/` empty), so treat this as a local-only gate, not a CI task.
 
 ## SDD Skills (orchestrator-only, not injected into sub-agents)
 

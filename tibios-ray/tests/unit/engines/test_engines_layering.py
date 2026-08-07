@@ -44,7 +44,7 @@ def test_engines_package_has_python_source_files_to_check() -> None:
     # Guards against a silently-empty glob making the next test vacuous.
     assert _ENGINES_PACKAGE.is_dir()
     source_files = list(_ENGINES_PACKAGE.glob("*.py"))
-    assert len(source_files) >= 2  # __init__, llamacpp
+    assert len(source_files) >= 4  # __init__, llamacpp, vllm, onnxrt
 
 
 def test_engines_source_imports_only_from_tibios_ray_backends() -> None:

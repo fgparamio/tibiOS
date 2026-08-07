@@ -160,6 +160,8 @@ uv run pyright             # type check
 
 No build step exists or is needed — this is a library/service package, not a compiled artifact.
 
+**Current limitation — `vllm` extra on Python 3.14**: the `vllm` optional extra (`uv sync --extra vllm`) is temporarily unavailable on Python 3.14, because upstream PyTorch (a transitive pin of vLLM) does not yet publish a cp314 wheel. This is an upstream packaging gap, not a TibiOS decision — `requires-python = ">=3.14"` is unaffected, and every non-vLLM capability (CPU development, the full unit test suite, all other backends) works normally on 3.14. GPU deployments that need vLLM today should use a dedicated Python 3.13 environment until upstream ships a compatible wheel; the version marker on the extra will be dropped once that happens.
+
 ## Spec-Driven Development (SDD)
 
 This project follows a proposal → spec → design → tasks → apply → verify → archive cycle for every substantial change, tracked under `openspec/`:
