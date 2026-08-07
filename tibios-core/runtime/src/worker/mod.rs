@@ -3,23 +3,44 @@
 //! `tokio::` path there). This module tree is where `runtime`'s sole
 //! `tokio` dependency is actually used.
 
+mod any;
 mod channel;
+#[cfg(test)]
+mod conformance;
 mod in_process;
 mod local_infer;
 mod registry;
 
+use any::AnyWorker;
 use in_process::InProcessWorker;
+use local_infer::build_local_infer_worker;
 use runtime_worker::WorkerService;
 
 pub use channel::MpscExecutionChannel;
 
-/// Builds the in-process `WorkerService`. The **only** way any caller
-/// obtains a worker instance — `InProcessWorker` is `pub(super)` and never
-/// re-exported, so no binding site can name the concrete type or the
-/// transport it implies (`worker-inprocess-adapter/spec.md`; design.md D5).
-/// Takes no arguments: per-execution behavior comes entirely from
-/// `ExecutionContext`, so there is nothing to configure here.
+/// Selects which concrete `WorkerService` implementation `any_worker`
+/// builds (`runtime-composition-root/spec.md`; design.md D10).
+pub enum WorkerKind {
+    /// Never selected by `main.rs` — the plain `bin` target always picks
+    /// `LocalInfer` — but exercised via `any_worker(WorkerKind::InProcess)`
+    /// by `any.rs`'s own conformance-suite invocations and eagerness test.
+    /// Precedent for a variant-level allow (not module-level):
+    /// `crates/runtime-worker/src/adapters/grpc/convert.rs:481`.
+    #[allow(dead_code)]
+    InProcess,
+    LocalInfer,
+}
+
+/// Builds a `WorkerService`, selecting the concrete implementation via
+/// `kind` — an implementation *selection*, which
+/// `02-project-structure.md`'s Composition Root section assigns exclusively
+/// to `runtime` (design.md D10). Neither `AnyWorker` nor either concrete
+/// Worker type is ever named outside `worker/`; only this function's `impl
+/// WorkerService` return type crosses that boundary.
 #[must_use]
-pub fn in_process_worker() -> impl WorkerService {
-    InProcessWorker::new()
+pub fn any_worker(kind: WorkerKind) -> impl WorkerService {
+    match kind {
+        WorkerKind::InProcess => AnyWorker::InProcess(InProcessWorker::new()),
+        WorkerKind::LocalInfer => AnyWorker::LocalInfer(build_local_infer_worker()),
+    }
 }

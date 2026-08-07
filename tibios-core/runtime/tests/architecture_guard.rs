@@ -791,3 +791,33 @@ fn local_infer_engine_declares_no_async_surface() {
         violations.join("\n")
     );
 }
+
+/// Spec scenario "No engine-specific name appears outside the engine module,
+/// including in local_infer/mod.rs" (`worker-local-infer-adapter/spec.md`):
+/// `llama`, `llama_cpp`, `ggml`, `candle` must never appear anywhere in
+/// `crates/runtime-worker/src/` or `runtime/src/`, excluding the engine
+/// subtree itself (`LOCAL_INFER_ENGINE_SRC`) — the one place a real
+/// inference backend's name is expected to eventually appear (design D12).
+/// Reuses `rust_files` (task 1.8) and `find_identifier_occurrences_in_files`
+/// (task 3.10) rather than adding a third file-walk helper.
+#[test]
+fn engine_names_stay_inside_the_engine_module() {
+    let root = workspace_root();
+    let engine_src = root.join(LOCAL_INFER_ENGINE_SRC);
+
+    let mut files = rust_files(&root.join("crates/runtime-worker/src"));
+    files.extend(
+        rust_files(&root.join("runtime/src"))
+            .into_iter()
+            .filter(|path| !path.starts_with(&engine_src)),
+    );
+
+    let violations =
+        find_identifier_occurrences_in_files(&files, &["llama", "llama_cpp", "ggml", "candle"]);
+
+    assert!(
+        violations.is_empty(),
+        "engine-specific names must stay inside `local_infer/engine/`:\n{}",
+        violations.join("\n")
+    );
+}

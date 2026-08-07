@@ -8,13 +8,6 @@
 //! budget cross the blocking boundary by polling `Registry::should_stop`,
 //! never by signalling (design.md D9).
 
-// Temporary: this and PR1's `engine/` subtree (declared below) aren't wired
-// into `main.rs`'s bin target until PR3's `any_worker` rebind — until then,
-// clippy sees the whole subtree as dead code from the bin target's point of
-// view, even though it's fully exercised by this module's own tests. This
-// allow disappears the moment PR3 lands.
-#![allow(dead_code)]
-
 use core::future::Future;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -370,15 +363,16 @@ mod tests {
     use std::time::Duration;
 
     use runtime_allocation::AllocationContract;
-    use runtime_primitives::{AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId};
+    use runtime_primitives::WorkloadId;
     use runtime_worker::{
-        EndOfStream, ExecutionContext, ExecutionEvent, ExecutionPhase, ObservabilityContext,
-        OutputChunk, Progress, ResolvedDependency, SecurityContext, WorkerCapability, WorkerError,
+        EndOfStream, ExecutionEvent, ExecutionPhase, OutputChunk, Progress, WorkerError,
         WorkerService,
     };
-    use tokio::sync::mpsc;
 
     use super::super::channel::MpscExecutionChannel;
+    use super::super::conformance::{
+        context_with, generous_channel, sample_context, worker_conformance_suite,
+    };
     use super::engine::{EngineError, GenerationRequest, GenerationSummary, TextGenerationEngine, TokenSink};
     use super::LocalInferWorker;
 
@@ -386,72 +380,7 @@ mod tests {
         LocalInferWorker::new()
     }
 
-    // Local fixtures — moved to `worker/conformance.rs` in PR3 (task 3.1)
-    // so both concrete Workers' test modules share one copy instead of
-    // duplicating it; kept inline here so PR2 compiles and tests standalone
-    // (no dependency on PR3 code, task 2.12).
-    fn context_with(
-        workload_id: WorkloadId,
-        allocation_contract: AllocationContract,
-        execution_parameters: BTreeMap<String, String>,
-    ) -> ExecutionContext {
-        let dependency = ResolvedDependency::new(
-            ObjectId::new(),
-            ObjectVersion::initial(),
-            ContentHash::new("sha256:af23"),
-        );
-        ExecutionContext::new(
-            workload_id,
-            AllocationId::new(),
-            allocation_contract,
-            vec![dependency],
-            SecurityContext::new("tenant-1", "principal-1", vec!["scope-a".to_string()]),
-            ObservabilityContext::new("trace-1", "span-1"),
-            execution_parameters,
-            WorkerCapability::new("chat.generate"),
-        )
-    }
-
-    fn sample_context(workload_id: WorkloadId) -> ExecutionContext {
-        context_with(
-            workload_id,
-            AllocationContract::new(Duration::from_secs(30)),
-            BTreeMap::new(),
-        )
-    }
-
-    fn generous_channel() -> (MpscExecutionChannel, mpsc::Receiver<ExecutionEvent>) {
-        let (sender, receiver) = mpsc::channel(32);
-        (MpscExecutionChannel::new(sender), receiver)
-    }
-
-    /// Task 2.4 (O1/O4 timing): a second `execute` for an already in-flight
-    /// `workload_id` is rejected synchronously, before any blocking task is
-    /// queued — nothing is ever emitted on the duplicate call's own
-    /// channel. Superseded by the shared conformance harness in PR3 (task
-    /// 3.4), which exercises the same obligation generically.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn a_duplicate_in_flight_execute_is_rejected_before_any_blocking_task_is_queued() {
-        let worker = worker();
-        let workload_id = WorkloadId::new();
-        let (first_channel, _first_receiver) = generous_channel();
-        let (second_channel, mut second_receiver) = generous_channel();
-
-        let first_execute = worker.execute(sample_context(workload_id), first_channel);
-        let duplicate_result = worker
-            .execute(sample_context(workload_id), second_channel)
-            .await;
-        assert!(matches!(
-            duplicate_result,
-            Err(WorkerError::DuplicateWorkload(id)) if id == workload_id
-        ));
-        assert!(second_receiver.try_recv().is_err());
-
-        let report = first_execute
-            .await
-            .expect("the first, still-registered execution must complete normally");
-        assert_eq!(report.final_phase, ExecutionPhase::Completed);
-    }
+    worker_conformance_suite!(worker());
 
     /// Task 2.1 (spike, gate): proves `Handle::block_on` called from inside
     /// `spawn_blocking` does not panic or deadlock on this toolchain/tokio

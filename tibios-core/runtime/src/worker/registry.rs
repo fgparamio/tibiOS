@@ -93,12 +93,6 @@ impl Registry {
     /// waiting (design.md D9). The `is_none()` half is the part a naive
     /// `is_cancelled` reuse would miss: it is how an abandoned blocking task
     /// learns nobody is waiting anymore.
-    ///
-    /// Temporary: `LocalInferWorker` (the only caller) isn't wired into
-    /// `main.rs`'s bin target until PR3 — until then this is dead code from
-    /// the bin target's point of view, though fully exercised by this
-    /// module's own tests. Disappears once PR3 lands.
-    #[allow(dead_code)]
     pub(super) fn should_stop(&self, workload_id: WorkloadId) -> bool {
         self.with_registry(|state| {
             state
@@ -106,7 +100,6 @@ impl Registry {
                 .is_none_or(|registration| registration.cancelled)
         })
     }
-
 
     /// Idempotent while registered (`worker-inbound-port/design.md` D11
     /// Decision): every call against a still-registered id returns another
