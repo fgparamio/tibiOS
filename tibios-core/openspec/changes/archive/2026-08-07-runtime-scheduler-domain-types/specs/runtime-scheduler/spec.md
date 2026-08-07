@@ -1,20 +1,6 @@
-# Scheduling Domain Specification
+# Delta for runtime-scheduler
 
-## Purpose
-
-`runtime-scheduler` is the Scheduling domain, implementing `14-resource-model.md` and `16-scheduling-engine.md`.
-
-## Requirements
-
-### Requirement: Exhaustive Dependency Set
-
-`runtime-scheduler` MUST depend on exactly `runtime-primitives` and `runtime-object` among workspace crates, and on no other workspace crate.
-
-#### Scenario: Declared dependencies match the allowed set
-
-- GIVEN `runtime-scheduler/Cargo.toml`
-- WHEN `cargo metadata` is inspected
-- THEN its workspace-crate dependencies are exactly `runtime-primitives` and `runtime-object`
+## MODIFIED Requirements
 
 ### Requirement: runtime-scheduler Exposes A Data Family, Still No Public Traits
 
@@ -33,6 +19,8 @@
 - GIVEN `runtime-scheduler/src/lib.rs`
 - WHEN its crate doc comment is read
 - THEN it references both `14-resource-model.md` and `16-scheduling-engine.md`
+
+## ADDED Requirements
 
 ### Requirement: Resource Describes Observable Capacity, Never Allocation State
 
@@ -90,7 +78,7 @@
 - WHEN an `AllocationPlan` is constructed from them
 - THEN construction succeeds and both are retrievable
 
-## Open Questions
+## Open Questions (Deferred — Not Answered By This Change)
 
 - **Full capability taxonomy** (GPU/CUDA/Metal/ROCm/etc.): `Resource`'s capacity/capability representation stays minimal this slice; a richer typed vocabulary is future work once a real Filter Policy needs it.
 - **Scheduling Metadata on `AllocationPlan`** (`Priority`, `Cost`, `Affinity`, `Locality Score`, `Energy Score`, `Rack Preference`, `AI Placement Score`, dependency list): deferred to the future Ports/behavior change — `AllocationPlan` in this slice carries only its core `WorkloadId`+`Candidate` binding, same "intentionally partial" precedent as `runtime-allocation`'s `AllocationContract`.
