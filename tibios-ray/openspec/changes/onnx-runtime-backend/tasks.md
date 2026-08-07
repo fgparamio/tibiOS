@@ -36,10 +36,10 @@ Strict TDD active (`uv run pytest -q`). Each numbered task is RED (failing test)
 - [x] 1.7 RED: single-flight under concurrency — `asyncio.gather` of two `acquire()`s with factory parked on a `threading.Event`, factory counter exactly 1 (OR2/VL6). GREEN: single-flight lock + double-check in `acquire()`. (deviation: no separate double-check needed — `asyncio.Lock`'s mutual exclusion in 1.6's implementation already makes single-flight structurally true, so this RED test passed immediately with no new production code.)
 - [x] 1.8 RED: teardown at zero / double-release / rebuild-after-teardown (OR2/VL13). GREEN: `release()` pop-under-lock, decrement, teardown at zero; second `release()` raises `UnknownSessionError`.
 - [x] 1.9 RED: providers reach the session factory, not `supports()` — default `("CPUExecutionProvider",)`, custom tuple when supplied (OR10). GREEN: wire `providers` construction argument through to the session factory call. (deviation: `_construct()` already threaded `self._providers` through in 1.6, so this RED test passed immediately with no new production code.)
-- [ ] 1.10 Modify `tests/unit/engines/test_engines_layering.py`: bump vacuity guard `>=3` -> `>=4` (scanner already recursive, covers `onnxrt.py`).
-- [ ] 1.11 RED/GREEN `src/tibios_ray/engines/__init__.py`: re-export both Backends, both Protocols, `ONNXRUNTIME_BACKEND_ID`; extend `__all__`; update `tests/unit/engines/test_engines_exports.py`.
-- [ ] 1.12 No code task: `backend-adapter` spec delta (`specs/backend-adapter/spec.md`, modality-agnostic Backend Contract phrasing) is doc-only — already authored, no corresponding code change.
-- [ ] 1.13 Local verification: `uv run pytest && uv run ruff check && uv run pyright` green for slice 1 (extra absent).
+- [x] 1.10 Modify `tests/unit/engines/test_engines_layering.py`: bump vacuity guard `>=3` -> `>=4` (scanner already recursive, covers `onnxrt.py`).
+- [x] 1.11 RED/GREEN `src/tibios_ray/engines/__init__.py`: re-export both Backends, both Protocols, `ONNXRUNTIME_BACKEND_ID`; extend `__all__`; update `tests/unit/engines/test_engines_exports.py`.
+- [x] 1.12 No code task: `backend-adapter` spec delta (`specs/backend-adapter/spec.md`, modality-agnostic Backend Contract phrasing) is doc-only — already authored, no corresponding code change.
+- [x] 1.13 Local verification: `uv run pytest && uv run ruff check && uv run pyright` green for slice 1 (extra absent).
 
 ## PR 2 — Execution
 
