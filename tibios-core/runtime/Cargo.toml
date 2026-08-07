@@ -11,8 +11,12 @@ workspace = true
 name = "runtime"
 path = "src/main.rs"
 
+[features]
+llamacpp = ["dep:llama-cpp-2"]
+
 [dependencies]
 tokio = { workspace = true }
+llama-cpp-2 = { workspace = true, optional = true }
 runtime-primitives = { workspace = true }
 runtime-object = { workspace = true }
 runtime-scheduler = { workspace = true }

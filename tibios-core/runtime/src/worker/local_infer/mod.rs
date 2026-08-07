@@ -355,6 +355,9 @@ where
     }
 }
 
+#[cfg(all(test, feature = "llamacpp"))]
+mod real_engine;
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -377,7 +380,7 @@ mod tests {
     use super::LocalInferWorker;
 
     fn worker() -> LocalInferWorker {
-        LocalInferWorker::new()
+        LocalInferWorker::with_engine(super::engine::deterministic_engine_for_tests())
     }
 
     worker_conformance_suite!(worker());

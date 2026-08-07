@@ -103,7 +103,7 @@ const EXTERNAL_ALLOWED: &[(&str, &[&str])] = &[
     ("runtime-deployment", &[]),
     ("runtime-api", &[]),
     ("runtime-federation", &[]),
-    ("runtime", &["tokio"]),
+    ("runtime", &["tokio", "llama-cpp-2"]),
 ];
 
 /// External crates whose presence signals generated transport code (design
@@ -116,6 +116,11 @@ const TRANSPORT_CRATES: &[&str] = &["prost", "tonic", "tonic-build"];
 /// Permitted An Async Runtime Dependency"): allowed for exactly one crate,
 /// `runtime` — see `async_runtime_is_allowlisted_for_exactly_one_crate`.
 const ASYNC_RUNTIME_CRATES: &[&str] = &["tokio"];
+
+/// External crates whose presence signals a native inference backend
+/// (`local-infer-llamacpp-engine/spec.md`): allowed for exactly one crate,
+/// `runtime` — see `inference_engine_dependencies_are_allowlisted_for_exactly_one_crate`.
+const INFERENCE_ENGINE_CRATES: &[&str] = &["llama-cpp-2"];
 
 /// Every expected workspace member, including `runtime` itself.
 const EXPECTED_MEMBERS: &[&str] = &[
@@ -379,6 +384,73 @@ fn async_runtime_is_allowlisted_for_exactly_one_crate() {
     }
 }
 
+/// Spec scenario "A table-only test pins the bindings crate to runtime
+/// alone" (`workspace-manifest/spec.md`): table-only test (no `cargo
+/// metadata`), mirroring `async_runtime_is_allowlisted_for_exactly_one_crate`
+/// — guards the `EXTERNAL_ALLOWED` TABLE itself, catching a `llama-cpp-2`
+/// entry pasted into a second row.
+#[test]
+fn inference_engine_dependencies_are_allowlisted_for_exactly_one_crate() {
+    for inference_engine_crate in INFERENCE_ENGINE_CRATES {
+        let owning_rows: Vec<&str> = EXTERNAL_ALLOWED
+            .iter()
+            .filter(|(_, deps)| deps.contains(inference_engine_crate))
+            .map(|(name, _)| *name)
+            .collect();
+
+        assert_eq!(
+            owning_rows,
+            vec!["runtime"],
+            "expected `{inference_engine_crate}` to be allowlisted for exactly `runtime`, found: {owning_rows:?}"
+        );
+    }
+}
+
+/// Spec scenario "The bindings crate is present in cargo metadata
+/// regardless of feature activation" + "The feature is off unless
+/// explicitly requested" (`workspace-manifest/spec.md`,
+/// `local-infer-llamacpp-engine/spec.md`): via `cargo_metadata`, `runtime`'s
+/// `llama-cpp-2` dependency has `optional == true`, `runtime`'s `features`
+/// map contains a `llamacpp` key, and `features["default"]` does not list
+/// it.
+#[test]
+fn the_inference_engine_dependency_is_optional_and_off_by_default() {
+    let metadata = workspace_metadata();
+
+    let runtime = metadata
+        .packages
+        .iter()
+        .find(|p| p.name.as_str() == "runtime")
+        .expect("runtime must be a workspace member");
+
+    let dependency = runtime
+        .dependencies
+        .iter()
+        .find(|d| d.name == "llama-cpp-2")
+        .expect("runtime must declare a llama-cpp-2 dependency");
+
+    assert!(
+        dependency.optional,
+        "runtime's llama-cpp-2 dependency must be declared optional = true"
+    );
+
+    assert!(
+        runtime.features.contains_key("llamacpp"),
+        "runtime's [features] table must declare a `llamacpp` feature, found: {:?}",
+        runtime.features.keys().collect::<Vec<_>>()
+    );
+
+    let default_features = runtime
+        .features
+        .get("default")
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !default_features.iter().any(|f| f == "llamacpp"),
+        "the `llamacpp` feature must not be a member of runtime's default feature set, found: {default_features:?}"
+    );
+}
+
 /// Meta-verification (spec scenario "Drift is caught"): proves the guard's
 /// core comparison logic actually fails, naming the crate and the
 /// unexpected dependency, when a crate gains an edge outside its allowed
@@ -515,6 +587,38 @@ fn contains_identifier(line: &str, identifier: &str) -> bool {
 
 fn is_identifier_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Lowercased, case-insensitive SUBSTRING match of `term` in `line` — unlike
+/// `contains_identifier`, this deliberately does NOT require word
+/// boundaries, so it subsumes `llama_cpp`, `llama_cpp_2`, `llamacpp`,
+/// `LlamaModel`, `LlamaBackend`, `LLAMA_*` (design D14). Used ONLY by
+/// `engine_names_stay_inside_the_engine_module`; `contains_identifier`
+/// stays unmodified everywhere else (whole-identifier matching is correct
+/// for `local_infer_engine_names_no_async_runtime` and
+/// `local_infer_engine_declares_no_async_surface`, where `async` must not
+/// flag `async_runtime_is_allowlisted_for_exactly_one_crate`).
+fn line_contains_engine_name_term(line: &str, term: &str) -> bool {
+    line.to_ascii_lowercase().contains(&term.to_ascii_lowercase())
+}
+
+/// True if `line` is a build-configuration attribute line whose only
+/// offending engine-name term is the `llamacpp` feature name itself (design
+/// D14 part 2). The feature gate is a Composition-Root build concept and
+/// may be named where builds are configured (`#[cfg(feature = "llamacpp")]`
+/// outside `engine/`); the engine's API may never leave `engine/`. Masking
+/// out `llamacpp` and re-checking for any of the three engine-name terms
+/// keeps this general: a `#[cfg]` line that ALSO names `llama_cpp_2` or
+/// `ggml` directly is still caught.
+fn line_is_exempt_engine_name_cfg_attribute(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with("#[cfg") {
+        return false;
+    }
+    let masked = trimmed.to_ascii_lowercase().replace("llamacpp", "");
+    !["llama", "ggml", "candle"]
+        .iter()
+        .any(|term| masked.contains(term))
 }
 
 /// True if `line` names the `adapters` identifier and is not a comment line.
@@ -757,6 +861,40 @@ fn find_identifier_occurrences(dir: &std::path::Path, identifiers: &[&str]) -> V
     find_identifier_occurrences_in_files(&rust_files(dir), identifiers)
 }
 
+/// Hardened counterpart to `find_identifier_occurrences_in_files` (design
+/// D14): scans `files` for any of `terms` using `line_contains_engine_name_term`
+/// (case-insensitive substring, not whole-identifier) instead of
+/// `contains_identifier`. Comment lines are skipped, matching every other
+/// scan's convention. Used only by `engine_names_stay_inside_the_engine_module`.
+fn find_engine_name_occurrences_in_files(
+    files: &[std::path::PathBuf],
+    terms: &[&str],
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for file in files {
+        let contents = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", file.display()));
+        for (line_number, line) in contents.lines().enumerate() {
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
+            if line_is_exempt_engine_name_cfg_attribute(line) {
+                continue;
+            }
+            for term in terms {
+                if line_contains_engine_name_term(line, term) {
+                    violations.push(format!(
+                        "{}:{}: contains forbidden engine-name term `{term}`",
+                        file.display(),
+                        line_number + 1
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
 /// Spec scenario "A whole-subtree token scan finds no tokio:: path and no
 /// async/await keyword" (`worker-local-infer-adapter/spec.md`): no `tokio`
 /// identifier anywhere under `local_infer/engine/`. Written before any
@@ -813,11 +951,141 @@ fn engine_names_stay_inside_the_engine_module() {
     );
 
     let violations =
-        find_identifier_occurrences_in_files(&files, &["llama", "llama_cpp", "ggml", "candle"]);
+        find_engine_name_occurrences_in_files(&files, &["llama", "ggml", "candle"]);
 
     assert!(
         violations.is_empty(),
         "engine-specific names must stay inside `local_infer/engine/`:\n{}",
         violations.join("\n")
+    );
+}
+
+/// Meta-verification (design D14, spec "The existing containment scan still
+/// passes with llamacpp.rs added to the engine subtree"): proves the
+/// hardened engine-name scan actually catches a split identifier —
+/// `use llama_cpp_2::LlamaModel;` — that `contains_identifier`'s
+/// whole-identifier matching lets through today (`"llama"` and
+/// `"llama_cpp"` both fail because the next byte is `_`). Mirrors
+/// `guard_logic_catches_an_unexpected_edge`'s synthetic-data precedent
+/// rather than mutating a real crate's source.
+///
+/// RED: `line_contains_engine_name_term` does not exist yet, so this test
+/// fails to compile.
+#[test]
+fn hardened_engine_name_scan_catches_a_split_identifier() {
+    let line = "use llama_cpp_2::LlamaModel;";
+
+    let caught = ["llama", "ggml", "candle"]
+        .iter()
+        .any(|term| line_contains_engine_name_term(line, term));
+
+    assert!(
+        caught,
+        "expected the hardened scan to catch `use llama_cpp_2::LlamaModel;`, \
+         which whole-identifier matching lets through (next byte after `llama`/`llama_cpp` is `_`)"
+    );
+}
+
+/// Spec/design D14 part 2: a `#[cfg(feature = "llamacpp")]` attribute line
+/// is a false positive under plain substring matching (`"llama"` is a
+/// substring of `"llamacpp"`) but names a Composition-Root build concept,
+/// not the engine's API — it must be exempted from the hardened scan.
+///
+/// RED: `line_is_exempt_engine_name_cfg_attribute` does not exist yet, so
+/// this test fails to compile.
+#[test]
+fn cfg_attribute_lines_are_exempt_from_the_engine_name_scan() {
+    let line = "#[cfg(feature = \"llamacpp\")]";
+
+    assert!(
+        line_is_exempt_engine_name_cfg_attribute(line),
+        "a `#[cfg(...)]` attribute line whose only offending term is the feature name \
+         must be exempted from the hardened engine-name scan"
+    );
+}
+
+/// Deferred from PR1's 1.5 (tasks.md 2.11, design D14 item 3): every line
+/// outside the engine subtree that names the `llamacpp` feature must be a
+/// bounded `#[cfg(...)]` build-configuration line — never a leaked engine
+/// identifier — and `local_infer/mod.rs`'s compile-time engine-selection
+/// hook (D10, task 2.10) must be one of them.
+///
+/// D14's original wording ("exactly one line, in `local_infer/mod.rs`")
+/// predates task 1.18's later, separately-approved discovery that
+/// `worker/any.rs` needed its own `#[cfg(not(feature = "llamacpp"))]` gate,
+/// for the same underlying reason (the real-dispatcher conformance tests
+/// cannot complete without an operator-supplied model). That gate is a
+/// legitimate, documented allowance, not a leak — so this test asserts the
+/// invariant D14 actually cares about (every occurrence is a named, bounded
+/// `#[cfg(...)]` line) rather than a count a prior, approved change already
+/// exceeds.
+///
+/// RED until task 2.10 adds the hook line to `local_infer/mod.rs`.
+#[test]
+fn the_feature_gate_is_named_on_exactly_one_line_outside_the_engine_subtree() {
+    let root = workspace_root();
+    let engine_src = root.join(LOCAL_INFER_ENGINE_SRC);
+
+    let mut files = rust_files(&root.join("crates/runtime-worker/src"));
+    files.extend(
+        rust_files(&root.join("runtime/src"))
+            .into_iter()
+            .filter(|path| !path.starts_with(&engine_src)),
+    );
+
+    let mut occurrences: Vec<(std::path::PathBuf, usize, String)> = Vec::new();
+    for file in &files {
+        let contents = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", file.display()));
+        for (line_number, line) in contents.lines().enumerate() {
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
+            if line.to_ascii_lowercase().contains("llamacpp") {
+                occurrences.push((file.clone(), line_number + 1, line.to_string()));
+            }
+        }
+    }
+
+    assert!(
+        !occurrences.is_empty(),
+        "expected at least one line outside the engine subtree to name the `llamacpp` \
+         feature (the `local_infer/mod.rs` selection hook)"
+    );
+
+    let non_cfg: Vec<&(std::path::PathBuf, usize, String)> = occurrences
+        .iter()
+        .filter(|(_, _, line)| !line.trim_start().starts_with("#[cfg"))
+        .collect();
+    assert!(
+        non_cfg.is_empty(),
+        "every `llamacpp` occurrence outside the engine subtree must be a bounded \
+         `#[cfg(...)]` attribute line:\n{}",
+        non_cfg
+            .iter()
+            .map(|(path, line_number, line)| format!(
+                "{}:{line_number}: {line}",
+                path.display()
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    let names_mod_rs = occurrences.iter().any(|(path, _, _)| {
+        path.strip_prefix(&root).unwrap_or(path)
+            == std::path::Path::new("runtime/src/worker/local_infer/mod.rs")
+    });
+    assert!(
+        names_mod_rs,
+        "the compile-time engine-selection hook must name `llamacpp` in \
+         `local_infer/mod.rs`, found only:\n{}",
+        occurrences
+            .iter()
+            .map(|(path, line_number, line)| format!(
+                "{}:{line_number}: {line}",
+                path.display()
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }
