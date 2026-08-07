@@ -49,25 +49,53 @@ All seven Providers MUST register together in one `CapabilityRegistry` without t
 - WHEN `catalog()` is called
 - THEN the returned `CapabilityCatalog.descriptors` contains exactly the seven Providers' descriptors, one per capability
 
-### Requirement: Uniform No-Backend Execution Failure
+### Requirement: No-Backend Execution Failure Is Wiring-Scoped
 
-Every Provider's `execute()` MUST raise `NoBackendAvailableError` unconditionally — no Provider holds a backend reference, so none can ever return a COMPLETED `ExecutionReport` or fabricate success.
+Chat, Embedding, and Rerank Providers (*wired*) dispatch to an injected
+Backend via the [ADR-0002](../../../docs/adr/0002-provider-backend-selection-delegation.md)
+flow instead of raising unconditionally; they fail only when their
+injected backend mapping is empty or the resolved plan names a
+`BackendId` absent from it (dispatch mechanics fixed by the
+`provider-backend-composition` spec). Vision, Speech (transcribe and
+synthesize), and OCR Providers (*unwired*) keep raising
+`NoBackendAvailableError` unconditionally, exactly as before.
+(Previously: "Uniform No-Backend Execution Failure" — every Provider's
+`execute()` raised `NoBackendAvailableError` unconditionally, with no
+wired/unwired distinction.)
 
-#### Scenario: Direct execute() call raises NoBackendAvailableError
+#### Scenario: Unwired Provider direct execute() call raises NoBackendAvailableError
 
-- GIVEN any of the seven Providers and a valid `ExecutionContext`
+- GIVEN one of the four unwired Providers (Vision, Speech-transcribe, Speech-synthesize, OCR) and a valid `ExecutionContext`
 - WHEN `execute()` is awaited directly
 - THEN `NoBackendAvailableError` is raised and no `ExecutionReport` is returned
 
-#### Scenario: WorkerRuntime dispatch surfaces a Failed report, not a bare exception
+#### Scenario: Unwired Provider dispatch surfaces a Failed report, not a bare exception
 
-- GIVEN a `WorkerRuntime` whose registry resolves to one of the seven Providers for the requested capability
+- GIVEN a `WorkerRuntime` whose registry resolves to one of the four unwired Providers
 - WHEN `WorkerRuntime.execute()` dispatches to that Provider
 - THEN `WorkerRuntime` catches the raised `NoBackendAvailableError` and returns an `ExecutionReport` with `phase == FAILED` — no exception escapes the Worker Contract boundary
 
+#### Scenario: Wired Provider dispatches instead of raising when its mapping and policy resolve a backend
+
+- GIVEN Chat, Embedding, or Rerank Provider constructed with a non-empty backend mapping and a policy that resolves a valid plan
+- WHEN `execute()` is awaited
+- THEN `NoBackendAvailableError` is not raised — the Provider dispatches per the `provider-backend-composition` spec
+
+#### Scenario: Wired Provider fails when its injected mapping is empty
+
+- GIVEN Chat, Embedding, or Rerank Provider constructed with an empty backend mapping
+- WHEN `execute()` is awaited
+- THEN execution fails — no backend is available to dispatch to
+
+#### Scenario: Wired Provider fails when the resolved plan names a backend absent from its mapping
+
+- GIVEN Chat, Embedding, or Rerank Provider whose injected mapping does not contain the `BackendId` named by `ModelSelectionPolicy.plan()`
+- WHEN `execute()` is awaited
+- THEN execution fails — it never falls back to a different entry in the mapping
+
 ### Requirement: Binding Invariants Carried Forward From the Frozen Contracts
 
-No Provider MUST hardcode a concrete model name outside its descriptor's catalog data, reference `local-infer`, encode a size/cost routing conditional, hold any backend reference, or invent a new backend protocol for vision, speech, or OCR. `src/tibios_ray/capabilities/` MUST NOT import from `src/tibios_ray/runtime/`.
+No Provider MUST hardcode a concrete model name outside its descriptor's catalog data, reference `local-infer`, encode a size/cost routing conditional, or invent a new backend protocol for vision, speech, or OCR. No Provider MUST construct, discover, or mutate a backend — only the Composition Root may construct Backend instances and wire them into Providers. Wired Providers may hold immutable references to injected Backend mappings; unwired Providers hold none. The no-branching AST scan MUST be scoped to the four unwired modules. `src/tibios_ray/capabilities/` MUST NOT import from `src/tibios_ray/runtime/`.
 
 #### Scenario: No hardcoded model, local-infer reference, or routing conditional exists
 
@@ -75,11 +103,23 @@ No Provider MUST hardcode a concrete model name outside its descriptor's catalog
 - WHEN searched for hardcoded model names, `local-infer` references, or size/cost conditionals
 - THEN none are found
 
-#### Scenario: Providers hold no backend reference and invent no new protocol
+#### Scenario: Wired Providers hold injected immutable mappings; unwired Providers hold no backend reference
 
 - GIVEN the seven Provider classes
-- WHEN inspected for fields/attributes and imports
-- THEN none holds a `BackendAdapter` (or other backend) reference, and no new backend protocol type is defined for vision, speech, or OCR
+- WHEN inspected for fields/attributes
+- THEN Chat, Embedding, and Rerank hold two immutable fields (backend mapping and selection policy), and Vision/Speech/OCR hold no backend reference
+
+#### Scenario: No Provider constructs, discovers, or mutates a backend
+
+- GIVEN the seven Provider module source files
+- WHEN inspected for backend construction (with `BackendId`, `BackendSession`, engine class names) and mutation of injected mappings
+- THEN none are found — the injected mapping is immutable at construction and not modified thereafter
+
+#### Scenario: No new backend protocol is invented for unwired capabilities
+
+- GIVEN the unwired Provider modules (Vision, Speech-transcribe, Speech-synthesize, OCR)
+- WHEN inspected for backend protocol types and their imports
+- THEN no new backend protocol type is defined; these modules remain zero-field
 
 #### Scenario: capabilities/ imports nothing from runtime/
 
