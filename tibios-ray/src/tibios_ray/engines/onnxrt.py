@@ -153,8 +153,8 @@ class _OnnxBackendBase:
         *,
         model_path: str,
         tokenizer_path: str,
-        session_factory: SessionFactory,
-        tokenizer_factory: TokenizerFactory,
+        session_factory: SessionFactory = default_session_factory,
+        tokenizer_factory: TokenizerFactory = default_tokenizer_factory,
         providers: Sequence[str] = _DEFAULT_PROVIDERS,
         output_name: str | None = None,
     ) -> None:
