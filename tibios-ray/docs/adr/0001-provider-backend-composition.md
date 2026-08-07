@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — amended by [0002](0002-provider-backend-selection-delegation.md)
+Accepted — amended by [0002](0002-provider-backend-selection-delegation.md) and [0003](0003-backend-resource-ownership.md)
 
 ## Context
 
