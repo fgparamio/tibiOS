@@ -206,6 +206,7 @@ No data migration, no feature flag. A deployment that sets no `TIBIOS_RAY_*` art
 ## Spec Conformance Notes (for `sdd-verify`)
 
 - **D25** and **D20** were resolved by correcting `provider-backend-composition/spec.md` itself (EndOfStream ownership assigned to `WorkerRuntime`; the dependency-count conditional added to the dispatch-mechanical allow-list) rather than by reinterpreting a `MUST` here — the design implements the spec as written, it does not explain around it.
+- **D26/D27** required the same treatment for a different spec: `llamacpp-text-backend/spec.md`'s "Residency Lifecycle Constructs and Frees One Model Per Session" fixed the residency count at one and tied `release()` to destruction — both false once a pool exists. Replaced with "Residency Is Backend-Owned, Not Request-Owned" (see the `llamacpp-text-backend` delta spec), stated as invariants — residency predates the request, construction belongs to the Backend's lifecycle, `acquire()` never constructs, `release()` never destroys, exhaustion is a bounded wait then `PoolExhaustedError`, the count is operator-configured — rather than naming a pool, so the requirement survives a future change in concurrency strategy the way D26's own pool survives a future change in count.
 - **D21** returns no `FAILED` report from a Provider. The spec's *"the resulting `FAILED` report"* is produced by `WorkerRuntime._dispatch`, unchanged.
 
 ## Open Questions

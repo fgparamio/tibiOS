@@ -679,12 +679,17 @@ fn runtime_worker_transport_types_stay_inside_the_private_adapter_module() {
     );
 }
 
-/// Spec scenario "No re-export escapes the private module"
-/// (`runtime-worker/spec.md`): the identifier `adapters` occurs exactly
-/// once outside `src/adapters/` itself, and that sole occurrence is the bare
-/// `mod adapters;` declaration in `lib.rs` — closing the `pub use
-/// crate::adapters::…` hole that the token scan alone would miss. Comment
-/// lines are skipped before scanning, matching
+/// Spec scenario "No re-export escapes the private module, except opaque
+/// Composition-Root factories" (`runtime-worker/spec.md`): every occurrence
+/// of the `adapters` identifier outside `src/adapters/` itself is either the
+/// bare `mod adapters;` declaration in `lib.rs`, or a single-item `pub use
+/// adapters::<name>;` re-export naming a Composition-Root factory function —
+/// never a glob, never a nested path, never the module or an adapter type
+/// itself. Each named factory is then required to actually exist as a `pub
+/// fn`/`pub async fn` somewhere under `src/adapters/` whose signature line
+/// names no transport token and returns an opaque `impl <port>` type,
+/// closing the `pub use crate::adapters::…` hole that the token scan alone
+/// would miss. Comment lines are skipped before scanning, matching
 /// `runtime_worker_transport_types_stay_inside_the_private_adapter_module`'s
 /// own comment-skip behavior, so a doc comment mentioning "adapters" in
 /// prose (plausible once new public modules under `execution/`/`ports/`
@@ -692,36 +697,97 @@ fn runtime_worker_transport_types_stay_inside_the_private_adapter_module() {
 #[test]
 fn runtime_worker_never_reexports_the_adapter_module() {
     let worker_src = workspace_root().join(WORKER_SRC);
-    let mut occurrences = Vec::new();
+    let mut mod_declarations = Vec::new();
+    let mut factory_names = Vec::new();
 
     for file in rust_files_excluding_adapters(&worker_src) {
         let contents = std::fs::read_to_string(&file)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", file.display()));
         for (line_number, line) in contents.lines().enumerate() {
-            if line_names_adapters_identifier(line) {
-                occurrences.push((file.clone(), line_number + 1, line.trim().to_string()));
+            if !line_names_adapters_identifier(line) {
+                continue;
             }
+            let trimmed = line.trim();
+            if trimmed == "mod adapters;" {
+                mod_declarations.push((file.clone(), line_number + 1));
+                continue;
+            }
+            let name = trimmed
+                .strip_prefix("pub use adapters::")
+                .and_then(|rest| rest.strip_suffix(';'))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "unexpected `adapters` occurrence at {}:{} — only a bare `mod adapters;` \
+                         declaration or a single-item `pub use adapters::<name>;` factory \
+                         re-export is allowed, found: {trimmed:?}",
+                        file.display(),
+                        line_number + 1
+                    )
+                });
+            assert!(
+                !name.is_empty() && !name.contains(['*', ':']),
+                "factory re-export at {}:{} must name exactly one item, no glob and no nested \
+                 path, found: {trimmed:?}",
+                file.display(),
+                line_number + 1
+            );
+            factory_names.push((file.clone(), line_number + 1, name.to_string()));
         }
     }
 
     assert_eq!(
-        occurrences.len(),
+        mod_declarations.len(),
         1,
-        "expected exactly one occurrence of the `adapters` identifier in runtime-worker's \
-         non-adapters source tree (the `mod adapters;` declaration), found: {occurrences:?}"
-    );
-
-    let (file, _line_number, trimmed_line) = &occurrences[0];
-    assert_eq!(
-        trimmed_line, "mod adapters;",
-        "the sole `adapters` occurrence must be a bare `mod adapters;` declaration, found: {trimmed_line:?}"
+        "expected exactly one `mod adapters;` declaration in runtime-worker's non-adapters \
+         source tree, found: {mod_declarations:?}"
     );
     assert_eq!(
-        file.file_name().and_then(|n| n.to_str()),
+        mod_declarations[0].0.file_name().and_then(|n| n.to_str()),
         Some("lib.rs"),
         "the `mod adapters;` declaration must live in lib.rs, found it in {}",
-        file.display()
+        mod_declarations[0].0.display()
     );
+
+    let adapters_dir = worker_src.join("adapters");
+    let adapters_files = rust_files(&adapters_dir);
+    for (file, line_number, name) in &factory_names {
+        let signature_prefix_fn = format!("pub fn {name}(");
+        let signature_prefix_async_fn = format!("pub async fn {name}(");
+
+        let signature_line = adapters_files.iter().find_map(|adapter_file| {
+            let contents = std::fs::read_to_string(adapter_file)
+                .unwrap_or_else(|e| panic!("failed to read {}: {e}", adapter_file.display()));
+            contents.lines().find_map(|line| {
+                let trimmed = line.trim_start();
+                (trimmed.starts_with(&signature_prefix_fn)
+                    || trimmed.starts_with(&signature_prefix_async_fn))
+                .then(|| trimmed.to_string())
+            })
+        });
+
+        let signature_line = signature_line.unwrap_or_else(|| {
+            panic!(
+                "factory `{name}` re-exported at {}:{} has no matching `pub fn {name}(` or \
+                 `pub async fn {name}(` declaration anywhere under {}",
+                file.display(),
+                line_number,
+                adapters_dir.display()
+            )
+        });
+
+        for token in TRANSPORT_TOKENS {
+            assert!(
+                !signature_line.contains(token),
+                "factory `{name}`'s signature must name no transport token, but contains \
+                 {token:?}: {signature_line:?}"
+            );
+        }
+        assert!(
+            signature_line.contains("impl "),
+            "factory `{name}`'s signature must return an opaque `impl <port>` type, found: \
+             {signature_line:?}"
+        );
+    }
 }
 
 /// Spec scenario "Generated code module is not public"

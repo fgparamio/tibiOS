@@ -14,10 +14,18 @@ from tibios_ray.testing.backend import RecordingBackend
 from tibios_ray.testing.cancellation import ManualCancellation
 from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.testing.context import FakeExecutionContext
+from tibios_ray.testing.embedding_backend import FakeEmbeddingBackend
+from tibios_ray.testing.policy import FakeModelSelectionPolicy
 from tibios_ray.testing.provider import StubProvider
+from tibios_ray.testing.rerank_backend import FakeRerankBackend
+from tibios_ray.testing.text_backend import FakeTextBackend
 
 __all__ = [
+    "FakeEmbeddingBackend",
     "FakeExecutionContext",
+    "FakeModelSelectionPolicy",
+    "FakeRerankBackend",
+    "FakeTextBackend",
     "InMemoryExecutionChannel",
     "ManualCancellation",
     "RecordingBackend",

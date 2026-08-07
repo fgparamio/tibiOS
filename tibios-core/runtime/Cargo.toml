@@ -35,3 +35,7 @@ runtime-federation = { workspace = true }
 
 [dev-dependencies]
 cargo_metadata = { workspace = true }
+# `spawn_fake_ray_server()`: the real-TCP fake `tibios-ray` server
+# `RayDispatch`'s conformance tests run against (design.md D3, D4). Not a
+# workspace member — see the root `Cargo.toml`'s `[workspace] exclude`.
+runtime-worker-test-harness = { path = "../crates/runtime-worker-test-harness" }

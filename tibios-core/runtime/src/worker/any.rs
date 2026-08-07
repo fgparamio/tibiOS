@@ -12,8 +12,10 @@ use runtime_worker::{
     WorkerService,
 };
 
+use super::channel::MpscExecutionChannel;
 use super::in_process::InProcessWorker;
 use super::local_infer::LocalInferWorker;
+use super::ray_dispatch::ErasedWorker;
 
 /// One concrete `WorkerService` per workspace implementation. `pub(super)`
 /// — never named outside `worker/` (design D10: `main.rs` selects via
@@ -21,6 +23,10 @@ use super::local_infer::LocalInferWorker;
 pub(super) enum AnyWorker {
     InProcess(InProcessWorker),
     LocalInfer(LocalInferWorker),
+    /// Erased via `ErasedWorker` (`worker-grpc-client-adapter/design.md`
+    /// D1) rather than held as a bare `RayWorker`, because `WorkerService`
+    /// itself isn't object-safe (`execute<C>` is generic).
+    Ray(Box<dyn ErasedWorker>),
 }
 
 impl WorkerService for AnyWorker {
@@ -42,6 +48,17 @@ impl WorkerService for AnyWorker {
             Self::InProcess(worker) => Box::pin(worker.execute(context, channel))
                 as Pin<Box<dyn Future<Output = _> + Send>>,
             Self::LocalInfer(worker) => Box::pin(worker.execute(context, channel)),
+            Self::Ray(worker) => {
+                // `ErasedWorker::execute` is object-safe only because it is
+                // monomorphized to `MpscExecutionChannel` (design D1) —
+                // `runtime` never constructs any other `ExecutionChannel`
+                // impl, so this downcast cannot fail in practice.
+                let channel: Box<dyn core::any::Any> = Box::new(channel);
+                let channel = channel
+                    .downcast::<MpscExecutionChannel>()
+                    .expect("runtime only ever constructs MpscExecutionChannel");
+                worker.execute(context, *channel)
+            }
         }
     }
 
@@ -54,6 +71,7 @@ impl WorkerService for AnyWorker {
                 Box::pin(worker.cancel(workload_id)) as Pin<Box<dyn Future<Output = _> + Send>>
             }
             Self::LocalInfer(worker) => Box::pin(worker.cancel(workload_id)),
+            Self::Ray(worker) => worker.cancel(workload_id),
         }
     }
 
@@ -66,6 +84,7 @@ impl WorkerService for AnyWorker {
                 Box::pin(worker.pulse(workload_id)) as Pin<Box<dyn Future<Output = _> + Send>>
             }
             Self::LocalInfer(worker) => Box::pin(worker.pulse(workload_id)),
+            Self::Ray(worker) => worker.pulse(workload_id),
         }
     }
 }
@@ -142,5 +161,18 @@ mod tests {
         worker_conformance_suite!(AnyWorker::LocalInfer(
             local_infer_worker_with_deterministic_engine()
         ));
+    }
+
+    // 6th invocation (task 3.9): `AnyWorker::Ray` via the real dispatcher
+    // `any_worker`, exercising `RayDispatch`'s eager `execute`/`cancel`/
+    // `pulse` forwarding through the object-safe `ErasedWorker` erasure —
+    // distinct from `ray_dispatch.rs`'s 5th invocation, which calls
+    // `runtime_worker::new_ray_worker` directly with no erasure involved.
+    mod any_ray_conformance {
+        use super::*;
+
+        worker_conformance_suite!(any_worker(WorkerKind::Ray(
+            runtime_worker_test_harness::spawn_fake_ray_server().await
+        )));
     }
 }
