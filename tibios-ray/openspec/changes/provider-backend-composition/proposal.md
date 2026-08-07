@@ -35,6 +35,7 @@ This change implements [ADR-0001](../../../docs/adr/0001-provider-backend-compos
 
 - `capability-providers`: three requirements change. "Uniform No-Backend Execution Failure" stops being uniform — it must split into *wired* (chat/embedding/rerank: dispatches; fails only when the mapping is empty or the plan names an absent backend) and *unwired* (the other four: unconditional). "Providers hold no backend reference" must narrow to *constructs, discovers, or mutates* no backend — holding an injected immutable mapping is now required. The no-branching AST scan must be scoped to the four unwired modules.
 - `model-selection-policy`: gains a concrete implementation requirement and the rejection rule for a `ServingPlan.backend` absent from `ServingConstraints.available_backends`. Today the spec constrains a Protocol nobody implements.
+- `llamacpp-text-backend`: "Residency Lifecycle Constructs and Frees One Model Per Session" is replaced by "Residency Is Backend-Owned, Not Request-Owned" — the invariant stays the same in kind (a request never constructs the model it uses) but no longer fixes the residency count at one or ties `release()` to destruction, since ADR-0003's pool of N pre-warmed instances (see Open Design Question 3) needs both to vary.
 
 ## Approach
 
