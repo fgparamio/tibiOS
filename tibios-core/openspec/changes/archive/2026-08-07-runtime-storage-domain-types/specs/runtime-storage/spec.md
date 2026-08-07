@@ -1,20 +1,6 @@
-# Storage Domain Specification
+# Delta for runtime-storage
 
-## Purpose
-
-`runtime-storage` implements the Runtime Storage Engine domain's stream-primitives data family (`21-runtime-storage-engine.md`). No Ports yet — `append`/`replay` and any backend are deferred to a future change.
-
-## Requirements
-
-### Requirement: Exhaustive Dependency Set
-
-`runtime-storage` MUST depend on exactly `runtime-primitives` among workspace crates, and on no other workspace crate.
-
-#### Scenario: Only primitives is a workspace dependency
-
-- GIVEN `runtime-storage/Cargo.toml`
-- WHEN `cargo metadata` is inspected
-- THEN its only workspace-crate dependency is `runtime-primitives`
+## MODIFIED Requirements
 
 ### Requirement: runtime-storage Exposes A Data Family, Still No Public Traits
 
@@ -33,6 +19,8 @@
 - GIVEN `runtime-storage/src/lib.rs`
 - WHEN its crate doc comment is read
 - THEN it references `21-runtime-storage-engine.md`
+
+## ADDED Requirements
 
 ### Requirement: StreamId Identifies A Per-Aggregate Consistency-Domain Stream
 
@@ -101,9 +89,3 @@ Any materialized "current state" view MUST always be a rebuildable projection of
 - **Q3 — Monotonic lifecycle progression**: deferred to `runtime-object`; unchanged here.
 
 Resolved by reference, not open: **Q2 — Transition ownership** — `23-object-store.md:174-176` establishes transitions originate in `runtime-object`.
-
-#### Scenario: Doc comment cites the owning doc
-
-- GIVEN `runtime-storage/src/lib.rs`
-- WHEN its crate doc comment is read
-- THEN it references `21-runtime-storage-engine.md`
