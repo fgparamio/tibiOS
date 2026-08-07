@@ -146,11 +146,20 @@ Confirmed via `cargo metadata --features llamacpp`: `llama-cpp-sys-2` resolves w
 |---|---|---|---|
 | Model path from env var | Unset path rejected | `an_unset_model_path_is_rejected_by_name` + `a_missing_model_yields_rejected_through_the_engine` | ✅ COMPLIANT |
 | Model path from env var | Unloadable path rejected | `an_unloadable_model_file_is_rejected_not_panicked` + `an_empty_or_nonexistent_model_path_is_rejected` | ✅ COMPLIANT |
-| Cancellation stops within one token | `SinkVerdict::Stop` halts real decoding | `cancelling_a_real_decode_loop_stops_well_before_max_tokens` (Tier-3, `#[ignore]`d, **not executed** — blocked on 2.13) | ⚠️ PARTIAL — code path traced sound (finding 7), no real execution evidence yet; expected/accepted per design's own disclosed risk |
+| Cancellation stops within one token | `SinkVerdict::Stop` halts real decoding | `cancelling_a_real_decode_loop_stops_well_before_max_tokens` (Tier-3, executed 2026-08-07 against `tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`) | ✅ COMPLIANT — executed for real, passed |
 | Real-engine tests ignored by default | `cargo test --workspace` never runs a real-model test | Empirically confirmed (54/54 feature-off, 4 ignored feature-on) | ✅ COMPLIANT |
 | llama.cpp name stays inside engine module | Hardened scan catches split-identifier / exempts cfg lines | `hardened_engine_name_scan_catches_a_split_identifier`, `cfg_attribute_lines_are_exempt_from_the_engine_name_scan` | ✅ COMPLIANT |
 | llama.cpp name stays inside engine module | Scan still passes with `llamacpp.rs` added | `engine_names_stay_inside_the_engine_module` | ✅ COMPLIANT |
-| `default_engine()` returns the llama.cpp engine when constructible | Feature-on branch returns the real engine | `real_engine.rs`'s 4 tests (all call `build_local_infer_worker()` → `default_engine()`'s feature-on branch), Tier-3, `#[ignore]`d, **not executed** | ⚠️ PARTIAL — compiles/type-checks (`--no-run` proof), no real execution evidence until 2.13 runs; same class of gap as PR1's W3, now properly scoped into an intentionally-ignored Tier-3 test rather than absent entirely |
+| `default_engine()` returns the llama.cpp engine when constructible | Feature-on branch returns the real engine | `real_engine.rs`'s 4 tests (all call `build_local_infer_worker()` → `default_engine()`'s feature-on branch), Tier-3, executed 2026-08-07 | ✅ COMPLIANT — executed for real, passed |
+
+### Task 2.13 — Tier-3 real-model run (manually executed 2026-08-07)
+
+Previously BLOCKED on operator hardware/model. Closed by a manual run on this machine (Apple M4):
+
+- Model: `tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf` (TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF, Q4_K_M, ~638MiB), llama architecture, `n_ctx=2048`.
+- Command: `TIBIOS_LOCAL_INFER_MODEL_PATH=<path> cargo test -p runtime --features llamacpp -- --ignored --nocapture`.
+- Result: `test result: ok. 4 passed; 0 failed; 0 ignored` — `a_real_model_streams_tokens_end_to_end`, `cancelling_a_real_decode_loop_stops_well_before_max_tokens`, `two_identical_requests_produce_identical_bytes`, `a_prompt_longer_than_the_context_window_is_rejected` all passed.
+- W6 corroboration: logs show `ggml_metal_device_init: GPU name: MTL0 (Apple M4)` (Metal backend initializes, as `cargo metadata` already showed) but `~llama_context: MTL0 compute buffer size is 0.0000 MiB` alongside a populated `CPU compute buffer size` — Metal is present but does zero compute work; `n_gpu_layers(0)` mitigation confirmed effective in practice, not just in theory. This is corroborating evidence for W6, not a new finding — W6 (wording accuracy) remains open until the docs are worded to disclose this.
 
 ## Open items before archive — roll-up across BOTH PR1 and PR2 verify passes
 
@@ -164,8 +173,8 @@ Confirmed via `cargo metadata --features llamacpp`: `llama-cpp-sys-2` resolves w
 
 **PR2** (this session):
 - W6 (CPU-only wording overclaim on Apple Silicon, `spec.md` + `TibiBox-Certification.md`) — **NEW, OPEN**. Needs a wording fix or explicit disclosed caveat before archive, if the team wants the spec/cert docs to be literally accurate for every platform the code has actually run on.
-- Task 2.13 (Tier-3 real-model run) — **BLOCKED** on operator hardware/model, not a defect. Should be closed by an operator before the change is considered hardware-validated; whether this is a hard gate for `sdd-archive` depends on the team's bar (the proposal's own "High risk: engine never executed by automation" is already accepted, not mitigated, per design.md D12).
+- Task 2.13 (Tier-3 real-model run) — **RESOLVED 2026-08-07**: all 4 Tier-3 tests executed manually against a real GGUF model (TinyLlama-1.1B Q4_K_M) on Apple M4, `4 passed; 0 failed`. See dedicated section above. The proposal's "High risk: engine never executed by automation" remains true (still not wired into CI), but the change is now hardware-validated at least once.
 - S1/S2 (PR1, cosmetic) — still applicable, non-blocking.
 - S3/S4 (PR2, cosmetic) — non-blocking.
 
-**Net across the full change: zero CRITICAL findings.** One new WARNING (W6) plus one still-open WARNING from PR1 (W5) plus two procedural maintainer sign-offs remain before a fully clean `sdd-archive`.
+**Net across the full change: zero CRITICAL findings.** Task 2.13 is now RESOLVED (real hardware run, 4/4 passed). One WARNING (W6, wording accuracy) plus one still-open WARNING from PR1 (W5) plus two procedural maintainer sign-offs remain before a fully clean `sdd-archive`.
