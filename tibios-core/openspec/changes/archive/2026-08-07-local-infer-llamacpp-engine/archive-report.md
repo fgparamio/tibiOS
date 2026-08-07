@@ -25,56 +25,35 @@ The `local-infer-llamacpp-engine` change has been successfully archived. All wor
 
 ---
 
-## Open Items — Not Blockers (Explicitly Accepted by Team)
+## Open Items — All Resolved (2026-08-07, post-archive follow-up)
 
-The following items remain open by explicit team decision to proceed to archive. All are **NOT CRITICAL** and have documented mitigations or follow-up plans.
+All four items below were open at initial archive time and have since been closed.
 
-### W5: `EXTERNAL_ALLOWED` Ownership Mismatch (Procedural)
+### W5: `EXTERNAL_ALLOWED` Ownership Mismatch — ✅ RESOLVED
 
-**Issue**: The `workspace-manifest/spec.md` delta spec attributes the `EXTERNAL_ALLOWED` table edit solely to the `workspace-manifest` capability, while `runtime/tests/architecture_guard.rs:4-5`'s header doc attributes it jointly to both `workspace-manifest` and `runtime-composition-root` specs.
+**Issue**: The `workspace-manifest/spec.md` delta spec attributed the `EXTERNAL_ALLOWED` table edit solely to the `workspace-manifest` capability, while `runtime/tests/architecture_guard.rs:4-5`'s header doc attributed it jointly to both `workspace-manifest` and `runtime-composition-root` specs.
 
-**Impact**: Minor; both specs exist, the edit is present in both domains. No functional defect.
-
-**Mitigation**: Reconciliation needed before final merge. Either:
-1. Update one spec to match the other's attribution, OR
-2. Add a note in both specs acknowledging the joint ownership.
-
-**Timeline**: Follow-up task, not a blocker for this archive.
+**Fix applied**: `openspec/specs/workspace-manifest/spec.md`'s "External-Dependency Allowlist Admits An Optional Inference-Engine Bindings Crate" requirement now opens with a joint-provenance note: `runtime-composition-root/spec.md` establishes `EXTERNAL_ALLOWED`'s base structure and the `("runtime", &["tokio"])` row; `workspace-manifest` governs how that row is extended for further external dependencies. Matches `architecture_guard.rs`'s own header doc exactly.
 
 ---
 
-### D10 & D14 Maintainer Sign-Off (Procedural)
+### D10 & D14 Maintainer Sign-Off — ✅ RESOLVED (confirmed 2026-08-07)
 
 **Issue 1 (D10)**: Design D10 narrowed proposal D4's mechanism from `execution_parameters["model_path"]` to `TIBIOS_LOCAL_INFER_MODEL_PATH` (env var). This deviates from the approved proposal but preserves all substantive commitments (out-of-band, resolved once, no registry, missing/unloadable → `Rejected`).
 
 **Issue 2 (D14)**: The proposal's Intent #3 claimed "the containment guards hold" for the identifiers this change introduces. D14 discovered the existing guard was vacuous against `llama_cpp_2` and `#[cfg(feature = "llamacpp")]` and hardened it. The proposal overstated the guard's readiness.
 
-**Impact**: Both are decisions made during design/apply, documented, and implemented. Verification passed. No functional defect.
-
-**Mitigation**: Both require explicit maintainer "yes" as flagged in:
-- Design.md Open Questions section
-- Tasks.md 1.17a/1.17b
-
-**Timeline**: Can be resolved after archive if the team decides. Recommend adding maintainer sign-off comments in PR1/PR2 descriptions.
+**Sign-off**: Maintainer confirmed "yes" to both on 2026-08-07. `design.md`'s Open Questions checkboxes for D10 and D14 are now checked, each annotated "Maintainer sign-off: confirmed 2026-08-07."
 
 ---
 
-### W6: CPU-Only Wording Overclaim on Apple Silicon (Minor, Disclosed)
+### W6: CPU-Only Wording Overclaim on Apple Silicon — ✅ RESOLVED
 
-**Issue**: The `local-infer-llamacpp-engine/spec.md` and `TibiBox-Certification.md` both assert "no GPU, Metal, CUDA, or ROCm acceleration path exists." This is literally false on Apple Silicon (macOS aarch64): the pinned `llama-cpp-2` crate's own `Cargo.toml` enables the Metal backend unconditionally on that target.
+**Issue**: The `local-infer-llamacpp-engine/spec.md` and `TibiBox-Certification.md` both asserted "no GPU, Metal, CUDA, or ROCm acceleration path exists." This was literally false on Apple Silicon (macOS aarch64): the pinned `llama-cpp-2` crate's own `Cargo.toml` enables the Metal backend unconditionally on that target.
 
-**Verification Evidence**: Running `TIBIOS_LOCAL_INFER_MODEL_PATH=tinyllama.gguf cargo test -p runtime --features llamacpp -- --ignored` on Apple M4 revealed `ggml_metal_device_init: GPU name: MTL0 (Apple M4)` in the logs.
+**Verification Evidence**: Running `TIBIOS_LOCAL_INFER_MODEL_PATH=tinyllama.gguf cargo test -p runtime --features llamacpp -- --ignored` on Apple M4 revealed `ggml_metal_device_init: GPU name: MTL0 (Apple M4)` in the logs, but a 0-byte Metal compute buffer alongside a fully populated CPU one — Metal initializes but performs zero compute work.
 
-**Actual Behavior**: Metal backend is present but performs **zero compute work** — all inference runs on CPU. The mitigation (`n_gpu_layers(0)` hardcoded) is effective in practice. Production targets (x86_64, Jetson Orin) are unaffected by the platform-specific Metal configuration.
-
-**Impact**: **Documentation accuracy**, not a behavioral defect. Spec wording is imprecise for Apple Silicon but correct in intent (CPU-only inference).
-
-**Mitigation**: Soften the spec/cert-doc wording to:
-- "CPU-only inference. GPU compute offload is disabled (`n_gpu_layers` pinned to 0), though the Metal backend may initialize on Apple Silicon and consume negligible memory."
-
-OR explicitly disclose: "Certification note: Metal backend presence does not affect CPU-bound inference; no GPU compute offload occurs."
-
-**Timeline**: Fix recommended before finalizing spec documentation. Verification was successful despite the wording gap.
+**Fix applied**: Both `openspec/specs/local-infer-llamacpp-engine/spec.md`'s Purpose section and `TibiBox-Certification.md`'s `local-infer` row were reworded to claim a *compute-path* guarantee (`n_gpu_layers(0)`, no GPU compute performed) rather than a *build-path* one (no GPU backend ever compiles in), and both now cite the buffer-size evidence. Production targets (x86_64, Jetson Orin) are unaffected by the Apple-Silicon-specific Metal auto-enable.
 
 ---
 

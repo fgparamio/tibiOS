@@ -56,6 +56,8 @@ The workspace MUST include an automated test, hosted inside the `runtime` crate 
 
 ### Requirement: The External-Dependency Allowlist Admits An Optional Inference-Engine Bindings Crate, Governed Like Any Other External Dependency
 
+`EXTERNAL_ALLOWED` (`runtime/tests/architecture_guard.rs`) has joint provenance, matching that file's own header doc: `runtime-composition-root/spec.md` establishes the table's base structure and its `("runtime", &["tokio"])` row; this `workspace-manifest` requirement governs how the table's `runtime` row is extended for further external dependencies, this one included. Neither spec owns the table exclusively.
+
 `runtime`'s row in `EXTERNAL_ALLOWED` (`runtime/tests/architecture_guard.rs`) MUST grow from `&["tokio"]` to also list the allowlisted llama.cpp bindings crate, even though that dependency is declared `optional = true` in `runtime/Cargo.toml`. `optional = true` MUST NOT be treated as exempting a dependency from the allowlist: `every_crate_declares_exactly_its_allowed_external_dependencies` reads `package.dependencies` from `cargo metadata`, filtered only on `DependencyKind::Normal | DependencyKind::Build` — a filter optional dependencies still pass, regardless of whether the `llamacpp` feature happens to be enabled for the `cargo metadata` invocation being measured. A new table-only test, `INFERENCE_ENGINE_CRATES`, MUST assert the bindings crate is allowlisted for exactly `runtime`, mirroring `transport_dependencies_are_allowlisted_for_exactly_one_crate` and `async_runtime_is_allowlisted_for_exactly_one_crate`.
 
 #### Scenario: The bindings crate is present in cargo metadata regardless of feature activation
