@@ -20,3 +20,12 @@ The gRPC/proto contract between `tibios-core` and `tibios-ray` lives in `../prot
 ## Conventions
 
 No project-specific conventions yet — this is a fresh skeleton (`uv`, Python ≥3.14, `ray` dependency). Global CLAUDE.md policy applies: conventional commits, no AI attribution.
+
+## Worktree hygiene (mandatory)
+
+`tibios-core` and `tibios-ray` share one `.git` — a worktree checked out anywhere in the monorepo contains BOTH projects. This has caused near-misses:
+
+- One worktree ending up host to two unrelated, concurrently in-flight changes (one per project), where a cleanup driven by one made the other's uncommitted state look at risk.
+- Before running `git worktree remove` on any worktree, check `git status --short` in **every** project subdirectory it contains (`tibios-core/`, `tibios-ray/`, not just the one you're working in) — not only your own.
+- If something looks uncommitted-and-at-risk, check whether it's already committed/merged upstream (`git log`, `origin/main`) before treating it as unique, unrecoverable work.
+- Prefer one worktree per unit of work, and commit early/often (even as unpushed WIP) so nothing valuable exists only as uncommitted state in a working tree.
