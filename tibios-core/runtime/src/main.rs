@@ -72,7 +72,11 @@ fn demo_context() -> ExecutionContext {
 async fn main() {
     let (sender, mut receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let channel = MpscExecutionChannel::new(sender); // the ONLY Sender, moved in
-    let worker = worker::any_worker(WorkerKind::LocalInfer);
+    let endpoint = std::env::var("TIBIOS_RAY_ENDPOINT").expect(
+        "TIBIOS_RAY_ENDPOINT must be set to the tibios-ray gRPC endpoint \
+         (e.g. http://127.0.0.1:50051)",
+    );
+    let worker = worker::any_worker(WorkerKind::Ray(endpoint));
 
     let drain = tokio::spawn(async move {
         let mut seen = 0usize;

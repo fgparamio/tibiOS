@@ -18,6 +18,15 @@ members = [
     "crates/runtime-federation",
     "runtime",
 ]
+# `runtime-worker-test-harness` is deliberately NOT a member: it exists only
+# to drive `runtime-worker`'s public API through a real gRPC transport in
+# `runtime`'s tests, and needs dependencies (`tokio`) production crates are
+# forbidden from carrying (`runtime-composition-root/spec.md`). Excluding it
+# keeps it outside `runtime/tests/architecture_guard.rs`'s `cargo_metadata`
+# scope entirely, so no workspace guard needs an exception for it. This is
+# the intended pattern for any future test-harness crate: real production
+# rules, test infrastructure lives outside them.
+exclude = ["crates/runtime-worker-test-harness"]
 
 [workspace.package]
 edition = "2024"

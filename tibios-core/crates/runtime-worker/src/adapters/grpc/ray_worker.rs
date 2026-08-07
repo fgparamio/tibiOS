@@ -5,34 +5,59 @@
 //! same containment `convert.rs` already relies on.
 
 use core::future::Future;
+use std::sync::Arc;
 
 use runtime_primitives::WorkloadId;
 use tonic::transport::Channel;
 
 use super::convert::ResponseFrame;
+use super::pending_submission::{PendingSubmissionGuard, PendingSubmissions};
 use super::tibios::worker::v1 as worker_proto;
 use super::tibios::worker::v1::worker_execution_client::WorkerExecutionClient;
 use crate::error::WorkerError;
 use crate::execution::context::ExecutionContext;
-use crate::execution::report::{CancelAck, ExecutionPulse, ExecutionReport};
+use crate::execution::report::{CancelAck, ExecutionPhase, ExecutionPulse, ExecutionReport};
 use crate::ports::execution_channel::ExecutionChannel;
 use crate::ports::worker_service::WorkerService;
+
+/// The `ExecutionReport` `execute()` synthesizes, without ever contacting
+/// the server, when `cancel()` arrives before `SubmitJob` is sent
+/// (`pending_submission.rs`): the workload never existed remotely, so there
+/// is nothing to ask the server about.
+fn cancelled_before_submission_report(context: &ExecutionContext) -> ExecutionReport {
+    ExecutionReport {
+        final_phase: ExecutionPhase::Cancelled,
+        duration: core::time::Duration::ZERO,
+        trace_id: context.observability_context().trace_id().to_string(),
+        summary: "cancelled before submission".to_string(),
+    }
+}
 
 /// Forwards `execute`/`cancel`/`pulse` to a remote `tibios-ray` process.
 /// `channel` is cloned per call — cloning a `tonic::transport::Channel` is
 /// cheap (a handle over a connection pool, not the connection itself),
 /// which is what lets `RayWorker` implement `WorkerService` on `&self`.
 ///
-/// `dead_code` is allowed here (not at module scope): `runtime`'s
-/// Composition Root (a later phase of `worker-grpc-client-adapter`, out of
-/// scope for this slice) is `ray_worker()`'s real caller; today it is
-/// exercised only by this module's own unit tests.
-#[allow(dead_code)]
+/// Stays unnamed outside this module: `runtime`'s Composition Root never
+/// sees `RayWorker` itself, only the opaque `impl WorkerService` that
+/// `new_ray_worker()` returns (`runtime-worker/spec.md`'s Composition-Root
+/// factory exception).
 struct RayWorker {
     channel: Channel,
+    /// O1/O4 bookkeeping for the window between `execute()` being called
+    /// and its `SubmitJob` being acknowledged — see `pending_submission.rs`.
+    /// Nothing tracks a workload here past that point; the server takes
+    /// over as sole authority.
+    pending: Arc<PendingSubmissions>,
 }
 
 impl WorkerService for RayWorker {
+    /// Not an `async fn`: `PendingSubmissionGuard::try_acquire` runs
+    /// synchronously in this function body, before the returned future is
+    /// ever polled, so a `cancel` issued right after `execute` is called —
+    /// even before its future is awaited even once — is never lost racing
+    /// against registration (mirrors `InProcessWorker::execute`,
+    /// `in_process.rs`).
     fn execute<C>(
         &self,
         context: ExecutionContext,
@@ -41,8 +66,22 @@ impl WorkerService for RayWorker {
     where
         C: ExecutionChannel,
     {
+        let workload_id = context.workload_id();
+        // O1 + O4, both synchronous — before any suspension point exists.
+        // On the `DuplicateWorkload` path this returns `None` *without*
+        // constructing a guard, so no `Drop` runs here that could remove
+        // the winning call's entry.
+        let acquired = PendingSubmissionGuard::try_acquire(Arc::clone(&self.pending), workload_id);
         async move {
-            let workload_id = context.workload_id();
+            let guard = acquired.ok_or(WorkerError::DuplicateWorkload(workload_id))?;
+
+            // The cancel-before-submit path: nothing was ever sent to the
+            // server, so nothing needs to be told to stop. Skips the
+            // network entirely.
+            if guard.is_cancel_requested() {
+                return Ok(cancelled_before_submission_report(&context));
+            }
+
             let wire_context: worker_proto::ExecutionContext = context.into();
             let mut client = WorkerExecutionClient::new(self.channel.clone());
 
@@ -51,6 +90,14 @@ impl WorkerService for RayWorker {
                 .await
                 .map_err(|status| WorkerError::from_status(status, workload_id))?
                 .into_inner();
+            // `SubmitJob` acknowledged: the server has now registered this
+            // workload (`pending_submission.rs`'s architectural rule) and
+            // is the sole authority for the rest of its lifecycle. Drop the
+            // guard early rather than holding it until this whole `async`
+            // block ends, so a concurrent `cancel()` stops seeing a
+            // (by-then-meaningless) local entry and falls through to the
+            // real server round trip immediately.
+            drop(guard);
 
             loop {
                 let response = stream
@@ -79,11 +126,22 @@ impl WorkerService for RayWorker {
         }
     }
 
+    /// The synchronous half — `mark_cancel_requested` — runs before the
+    /// returned future is polled, same eagerness reasoning as `execute`:
+    /// a `cancel` racing a not-yet-submitted `execute` must never be lost
+    /// to a registration race, and marking the local entry synchronously,
+    /// not from inside the `async move` block, is what guarantees that.
     fn cancel(
         &self,
         workload_id: WorkloadId,
     ) -> impl Future<Output = Result<CancelAck, WorkerError>> + Send {
+        let cancelled_before_submission = self.pending.mark_cancel_requested(workload_id);
         async move {
+            if cancelled_before_submission {
+                // Nothing was ever sent to the server for this workload
+                // (`pending_submission.rs`) — nothing to ask it to stop.
+                return Ok(CancelAck);
+            }
             let mut client = WorkerExecutionClient::new(self.channel.clone());
             let request = worker_proto::CancelRequest {
                 workload_id: Some(workload_id.into()),
@@ -129,12 +187,14 @@ impl WorkerService for RayWorker {
 /// Panics if `endpoint` is not a syntactically valid URI. `endpoint` is
 /// Composition-Root configuration (`TIBIOS_RAY_ENDPOINT`), not
 /// attacker-controlled input.
-#[allow(dead_code)]
-pub fn ray_worker(endpoint: String) -> impl WorkerService {
+pub fn new_ray_worker(endpoint: String) -> impl WorkerService {
     let channel = Channel::from_shared(endpoint)
         .expect("TIBIOS_RAY_ENDPOINT must be a valid URI")
         .connect_lazy();
-    RayWorker { channel }
+    RayWorker {
+        channel,
+        pending: Arc::new(PendingSubmissions::default()),
+    }
 }
 
 #[cfg(test)]
@@ -147,7 +207,7 @@ mod tests {
     use super::super::tibios::worker::v1::worker_execution_server::{
         WorkerExecution, WorkerExecutionServer,
     };
-    use super::{Channel, RayWorker, ray_worker, worker_proto};
+    use super::{Arc, Channel, PendingSubmissions, RayWorker, new_ray_worker, worker_proto};
     use crate::error::WorkerError;
     use crate::execution::context::{
         ExecutionContext, ObservabilityContext, SecurityContext, WorkerCapability,
@@ -179,21 +239,21 @@ mod tests {
 
     #[tokio::test]
     async fn execute_against_an_unreachable_endpoint_returns_transport_error() {
-        let worker = ray_worker("http://127.0.0.1:1".to_string());
+        let worker = new_ray_worker("http://127.0.0.1:1".to_string());
         let result = worker.execute(sample_context(), NoopChannel).await;
         assert!(matches!(result, Err(WorkerError::Transport { .. })));
     }
 
     #[tokio::test]
     async fn cancel_against_an_unreachable_endpoint_returns_transport_error() {
-        let worker = ray_worker("http://127.0.0.1:1".to_string());
+        let worker = new_ray_worker("http://127.0.0.1:1".to_string());
         let result = worker.cancel(WorkloadId::new()).await;
         assert!(matches!(result, Err(WorkerError::Transport { .. })));
     }
 
     #[tokio::test]
     async fn pulse_against_an_unreachable_endpoint_returns_transport_error() {
-        let worker = ray_worker("http://127.0.0.1:1".to_string());
+        let worker = new_ray_worker("http://127.0.0.1:1".to_string());
         let result = worker.pulse(WorkloadId::new()).await;
         assert!(matches!(result, Err(WorkerError::Transport { .. })));
     }
@@ -287,7 +347,10 @@ mod tests {
             .connect()
             .await
             .expect("connect to the stub server");
-        let worker = RayWorker { channel };
+        let worker = RayWorker {
+            channel,
+            pending: Arc::new(PendingSubmissions::default()),
+        };
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let result = worker

@@ -1,0 +1,29 @@
+[package]
+name = "runtime-worker-test-harness"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# Deliberately NOT a workspace member (see `[workspace] exclude` in the root
+# `Cargo.toml`) — this crate exists solely so `runtime`'s conformance tests
+# can exercise `runtime_worker::new_ray_worker` against a real fake gRPC
+# server. It carries `tokio` and its own generated proto types, which the
+# `runtime-composition-root` spec forbids `runtime-worker` from ever gaining
+# (`runtime/tests/architecture_guard.rs`'s `async_runtime_is_allowlisted_for_exactly_one_crate`).
+# Being workspace-excluded keeps it outside `architecture_guard.rs`'s
+# `cargo_metadata` scope entirely, so no guard or spec needs an exception for
+# it. Test harness crates like this one are exempt from the workspace's
+# production dependency rules by design: they exist only to drive production
+# code through its public API, never to ship.
+
+[dependencies]
+runtime-primitives = { path = "../runtime-primitives" }
+runtime-allocation = { path = "../runtime-allocation" }
+runtime-worker = { path = "../runtime-worker" }
+tonic = "0.13"
+prost = "0.13"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+
+[build-dependencies]
+tonic-build = "0.13"

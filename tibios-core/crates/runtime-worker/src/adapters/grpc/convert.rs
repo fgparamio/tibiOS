@@ -566,14 +566,6 @@ impl TryFrom<worker_proto::ExecutionPulse> for crate::execution::report::Executi
 /// sibling module under `grpc`) routes `SubmitJob` response frames through
 /// this type. Still confined to the `grpc` subtree — never `pub` — so it
 /// stays outside this crate's public surface.
-///
-/// `dead_code` is allowed here (not at module scope): `RayWorker` is this
-/// type's real caller, and `RayWorker` itself is only reachable from
-/// `runtime`'s Composition Root (a later phase of
-/// `worker-grpc-client-adapter`, out of scope for this slice) — so this
-/// type is unreachable in a plain (non-test) library build until that
-/// wiring lands, even though `ray_worker.rs` already calls it.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum ResponseFrame {
     Event(crate::execution::event::ExecutionEvent),
@@ -604,13 +596,6 @@ impl crate::error::WorkerError {
     /// `Transport`, classified by `transport_kind`. Defined here rather
     /// than in `error.rs` because this crate's architecture guard forbids
     /// any `tonic::` token outside the private adapter module.
-    ///
-    /// `dead_code` is allowed here (not at module scope): `RayWorker`
-    /// (`adapters/grpc/ray_worker.rs`) is this function's real caller, but
-    /// `RayWorker` itself awaits Composition-Root wiring (a later phase,
-    /// out of scope for this slice), so this stays unreachable in a plain
-    /// (non-test) library build until then.
-    #[allow(dead_code)]
     pub(crate) fn from_status(
         status: tonic::Status,
         workload_id: runtime_primitives::WorkloadId,
@@ -630,12 +615,6 @@ impl crate::error::WorkerError {
 /// table. A code the table does not name (e.g. `Cancelled`) defaults to
 /// `Permanent`: retry-looping an unrecognized rejection is worse than giving
 /// up once on it.
-///
-/// `dead_code` is allowed here (not at module scope): `from_status` is this
-/// function's only caller, and `from_status` is itself unreachable outside
-/// `#[cfg(test)]` until `RayWorker` is wired into the Composition Root (a
-/// later phase, out of scope for this slice).
-#[allow(dead_code)]
 fn transport_kind(code: tonic::Code) -> runtime_primitives::ErrorClass {
     use tonic::Code;
     match code {
