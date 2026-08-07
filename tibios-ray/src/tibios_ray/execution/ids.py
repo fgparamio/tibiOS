@@ -32,3 +32,19 @@ class ContentHash:
     """Identity of an immutable Content Object, e.g. ``sha256:...``."""
 
     value: str
+
+
+@dataclass(frozen=True, slots=True)
+class WorkloadId:
+    """Identity of one execution — a ULID string; the sole correlation key
+    for `Cancel`/`Pulse` (``18-worker-model.md``, ``execution-identity``)."""
+
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
+class AllocationId:
+    """Identity of the Allocation an execution runs under — a ULID string
+    (``18-worker-model.md``, ``execution-identity``)."""
+
+    value: str

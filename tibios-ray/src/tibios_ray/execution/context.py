@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
-from tibios_ray.execution.ids import ContentHash, ObjectId, ObjectVersion
+from tibios_ray.execution.ids import (
+    AllocationId,
+    ContentHash,
+    ObjectId,
+    ObjectVersion,
+    WorkloadId,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -49,23 +55,62 @@ class ResolvedModelRef:
 class AllocationContract:
     """Immutable execution constraints a Capability Provider honors —
     never creates, modifies, or renews (``18-worker-model.md`` /
-    ``15-allocation-model.md``)."""
+    ``15-allocation-model.md``).
 
-    exclusive: bool
-    renewable_lease: bool
-    preemptible: bool
-    migration_allowed: bool
-    checkpoint_required: bool
+    Intentionally partial: carries exactly ``max_execution_duration``,
+    matching ``runtime-allocation``'s own shape verbatim (design decision
+    D9). tibios-ray is a *consumer* of this contract — per
+    ``02-project-structure.md``'s Ownership Boundaries table
+    (``Allocation -> AllocationContract -> Worker``), the producer owns
+    the contract's shape, so this type MUST NOT define fields the
+    producer does not send. ``15-allocation-model.md``'s own future
+    change is the sole owner of the remaining facets (exclusive/shared,
+    renewable lease, preemptible, migration allowed, checkpoint
+    required).
+    """
+
     max_execution_duration: timedelta
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SecurityContext:
+    """Tenant/principal/scope carried by the Execution Context — never
+    interpreted by a Worker to make authorization or dispatch decisions
+    (``18-worker-model.md:136``, ``execution-identity``)."""
+
+    tenant_id: str
+    principal_id: str
+    grant_scope: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ObservabilityContext:
+    """Trace/span identifiers carried by the Execution Context — MAY be
+    propagated into observability outputs but MUST NOT influence dispatch
+    or control-flow decisions (``execution-identity``)."""
+
+    trace_id: str
+    span_id: str
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ExecutionContext:
     """Everything required to execute one unit of work, created by the
-    Runtime and immutable thereafter (``18-worker-model.md``)."""
+    Runtime and immutable thereafter (``18-worker-model.md``).
 
+    Ten fields, eight of them wire-visible (design decision D8); no
+    nested envelope — ``18-worker-model.md:52`` describes one immutable
+    Execution Context containing all of it. ``channel``/``cancellation``
+    stay domain-only: the wire has no field for either.
+    """
+
+    workload_id: WorkloadId
+    allocation_id: AllocationId
     capability: str
     allocation_contract: AllocationContract
-    dependencies: Mapping[str, ResolvedModelRef]
+    dependencies: tuple[ResolvedModelRef, ...]
+    security_context: SecurityContext
+    observability_context: ObservabilityContext
+    execution_parameters: Mapping[str, str]
     channel: ExecutionChannel
     cancellation: CancellationToken
