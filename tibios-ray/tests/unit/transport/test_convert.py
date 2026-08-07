@@ -8,6 +8,7 @@ variant classifies as Permanent").
 """
 
 
+from collections.abc import Callable
 from datetime import timedelta
 
 import pytest
@@ -20,6 +21,7 @@ from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
 from tibios_ray.transport.errors import (
+    ConversionError,
     EmptyCapabilityError,
     ErrorClass,
     InvalidObjectVersionError,
@@ -480,3 +482,104 @@ class TestWorkloadIdFromPulseRequest:
             workload_id_from_pulse_request(message)
         assert "workload_id" in str(excinfo.value)
         assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+
+def _rejection_scenarios() -> list[tuple[str, Callable[[], object]]]:
+    """Every rejection variant introduced by this slice (3a.4-3a.12), one
+    entry per distinct malformed-input shape. Shared by 3a.14 (classifies
+    `ErrorClass.PERMANENT`) and 3a.15 (never a bare/unguarded exception)
+    so both cross-cutting assertions run over the same scenario set."""
+
+    from tibios_ray.transport.convert import (
+        allocation_contract_from_wire,
+        allocation_id_from_wire,
+        capability_from_wire,
+        duration_from_wire,
+        object_id_from_wire,
+        object_version_from_wire,
+        resolved_model_ref_from_wire,
+        workload_id_from_wire,
+    )
+
+    return [
+        (
+            "invalid_ulid_object_id",
+            lambda: object_id_from_wire(identity_pb2.ObjectId(value="not-a-ulid")),
+        ),
+        (
+            "invalid_ulid_workload_id",
+            lambda: workload_id_from_wire(identity_pb2.WorkloadId(value="not-a-ulid")),
+        ),
+        (
+            "invalid_ulid_allocation_id",
+            lambda: allocation_id_from_wire(identity_pb2.AllocationId(value="not-a-ulid")),
+        ),
+        (
+            "non_numeric_object_version",
+            lambda: object_version_from_wire(identity_pb2.ObjectVersion(value="not-a-number")),
+        ),
+        (
+            "unset_required_identity_field",
+            lambda: resolved_model_ref_from_wire(worker_pb2.ResolvedModelRef()),
+        ),
+        (
+            "unset_worker_capability",
+            lambda: capability_from_wire(worker_pb2.ExecutionContext()),
+        ),
+        (
+            "empty_worker_capability",
+            lambda: capability_from_wire(
+                worker_pb2.ExecutionContext(
+                    worker_capability=worker_pb2.WorkerCapability(value="")
+                )
+            ),
+        ),
+        (
+            "missing_allocation_contract",
+            lambda: allocation_contract_from_wire(worker_pb2.ExecutionContext()),
+        ),
+        (
+            "negative_duration",
+            lambda: duration_from_wire(duration_pb2.Duration(seconds=-1), field="test"),
+        ),
+    ]
+
+
+class TestEveryRejectionClassifiesPermanent:
+    """3a.14 — `worker-wire-conversion`: "Every rejection variant
+    classifies as Permanent"."""
+
+    @pytest.mark.parametrize(
+        "convert", [scenario for _, scenario in _rejection_scenarios()],
+        ids=[label for label, _ in _rejection_scenarios()],
+    )
+    def test_rejection_classifies_permanent(self, convert: Callable[[], object]) -> None:
+        with pytest.raises(ConversionError) as excinfo:
+            convert()
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+
+class TestNoConversionPathPanics:
+    """3a.15 — `worker-wire-conversion`: "No conversion path panics on
+    malformed input". Every rejection scenario must raise a
+    `ConversionError` subclass specifically, never a bare/unguarded
+    exception (`KeyError`, `ValueError`, `AttributeError`, ...)."""
+
+    @pytest.mark.parametrize(
+        "convert", [scenario for _, scenario in _rejection_scenarios()],
+        ids=[label for label, _ in _rejection_scenarios()],
+    )
+    def test_rejection_raises_conversion_error_not_a_bare_exception(
+        self, convert: Callable[[], object]
+    ) -> None:
+        try:
+            convert()
+        except ConversionError:
+            return
+        except Exception as unguarded:  # noqa: BLE001 - this is the assertion itself
+            pytest.fail(
+                f"conversion path panicked with a bare {type(unguarded).__name__} "
+                "instead of raising a ConversionError subclass"
+            )
+        else:
+            pytest.fail("expected conversion to raise ConversionError, but it succeeded")

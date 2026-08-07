@@ -32,7 +32,9 @@ class TestConversionErrorFamily:
         assert ConversionError("boom").error_class is ErrorClass.PERMANENT
 
     def test_invalid_ulid_error_classifies_permanent(self) -> None:
-        assert InvalidUlidError("WorkloadId.value", "not-a-ulid").error_class is ErrorClass.PERMANENT
+        assert (
+            InvalidUlidError("WorkloadId.value", "not-a-ulid").error_class is ErrorClass.PERMANENT
+        )
 
     def test_invalid_object_version_error_classifies_permanent(self) -> None:
         assert (
