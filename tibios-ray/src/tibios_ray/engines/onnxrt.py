@@ -176,13 +176,61 @@ class _OnnxBackendBase:
         return ONNXRUNTIME_BACKEND_ID
 
     def supports(self, plan: ServingPlanLike) -> bool:
-        raise NotImplementedError  # task 1.5
+        # OR5/LC12: `supports()` cannot distinguish embedding from
+        # rerank — `ServingPlanLike` exposes only `.backend`, so this is
+        # a backend-family check only, identical on both concrete types.
+        return plan.backend == ONNXRUNTIME_BACKEND_ID
 
     async def acquire(self, plan: ServingPlanLike) -> BackendSession:
-        raise NotImplementedError  # tasks 1.6/1.7
+        # OR2/OR6: construct-or-reuse plus refcount, entirely under
+        # `self._lock` — session and tokenizer are constructed together,
+        # in the same critical section, so they share one lifetime.
+        # `asyncio.Lock` alone makes single-flight construction correct
+        # (VL5/VL6 inherited): no second coroutine can observe
+        # `self._residency is None` while the first is still building
+        # it — no separate double-check is needed, the lock's exclusion
+        # already rules that interleaving out.
+        async with self._lock:
+            residency = self._residency
+            if residency is None:
+                residency = await asyncio.to_thread(self._construct)
+                self._residency = residency
+            residency.refcount += 1
+
+        session_id = _new_session_id()
+        self._sessions[session_id] = residency
+        return BackendSession(backend_id=ONNXRUNTIME_BACKEND_ID, session_id=session_id)
+
+    def _construct(self) -> _OnnxResidency:
+        # Runs off the event loop (`asyncio.to_thread` above): loading
+        # ORT graph weights and a tokenizer vocabulary is blocking I/O
+        # plus graph optimization, seconds of latency on first
+        # `acquire()` (OR2's rationale). `get_inputs()` is queried once
+        # here and cached (OR8) — never re-queried on reuse.
+        session = self._session_factory(self._model_path, self._providers)
+        tokenizer = self._tokenizer_factory(self._tokenizer_path)
+        input_names = frozenset(node.name for node in session.get_inputs())
+        return _OnnxResidency(session=session, tokenizer=tokenizer, input_names=input_names)
 
     async def release(self, session: BackendSession) -> None:
-        raise NotImplementedError  # task 1.8
+        # OR2/VL13: pop under the lock and raise if absent — double
+        # release, a foreign session, or never-acquired all look
+        # identical here (idempotent-by-rejection, LC2 inherited).
+        # Popping under the lock makes a negative refcount structurally
+        # impossible: a second release() of the same session never
+        # reaches the decrement below.
+        async with self._lock:
+            residency = self._sessions.pop(session.session_id, None)
+            if residency is None:
+                raise UnknownSessionError(session.session_id)
+
+            residency.refcount -= 1
+            if residency.refcount == 0:
+                # `InferenceSessionLike` has no close/shutdown method
+                # (design.md "Key Contracts") — ORT sessions need no
+                # explicit teardown call, unlike llama.cpp's `Llama` or
+                # vLLM's `AsyncLLM`. Dropping the reference is teardown.
+                self._residency = None
 
     def _residency_for(self, session: BackendSession) -> _OnnxResidency:
         residency = self._sessions.get(session.session_id)
