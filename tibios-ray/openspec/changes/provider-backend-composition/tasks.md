@@ -118,16 +118,16 @@ Depends on Slice 3.
 
 Depends on Slice 4 (reuses the same conformance-split pattern and `dispatch.py`/`requests.py` seams `chat.py` exercised first).
 
-- [ ] 5.1 Test: extend `test_provider_conformance.py::test_provider_declares_no_fields` — `EmbeddingProvider` and `RerankProvider` also declare exactly `backends` + `selection_policy`, immutable, completing the parameterization started in 4.1
-- [ ] 5.2 Test: `tests/unit/capabilities/test_embedding.py` — successful dispatch (`embed()` via `acquire`/`release`), release guarantee (raise mid-execute / `acquire()` raises), empty-mapping and absent-plan-backend failures, cancellation → `CANCELLED` — same coverage shape as `test_chat.py` 4.3/4.5/4.6/4.7, embedding-specific
-- [ ] 5.3 Test: extend `test_embedding.py` — D24 embedding codec: exactly one `OutputChunk`, `sequence=0`, `json.loads(data)` round-trips `{"vectors": [[...], ...]}` in input order; `ExecutionReport` carries none of the vectors (`provider-backend-composition` spec: Embedding output appears on the channel, not the report)
-- [ ] 5.4 Implement: `src/tibios_ray/capabilities/embedding.py` — two injected fields, real `execute()` using `dispatch.py`/`requests.py`, D24 embedding codec
-- [ ] 5.5 Test: `tests/unit/capabilities/test_rerank.py` — successful dispatch, release guarantee, empty-mapping/absent-plan-backend failures, cancellation — same shape as embedding, rerank-specific
-- [ ] 5.6 Test: extend `test_rerank.py` — D24 rerank codec: exactly one `OutputChunk`, `sequence=0`, `json.loads(data)` round-trips `{"results": [{"index": i, "score": s}, ...]}` in order; `ExecutionReport` carries none of the scores (`provider-backend-composition` spec: Rerank output appears on the channel, not the report)
-- [ ] 5.7 Implement: `src/tibios_ray/capabilities/rerank.py` — two injected fields, real `execute()`, D24 rerank codec
-- [ ] 5.8 Test: complete `test_provider_conformance.py::test_execute_always_raises_no_backend_available_error` split for embedding + rerank (Test Impact table, row 2 — completing the split started in 4.9)
-- [ ] 5.9 Test: no-scoring / no-branching check for `embedding.py` and `rerank.py`, mirroring 4.10
-- [ ] 5.10 Verify slice 5 green: `uv run pytest tests/unit/capabilities/ && uv run ruff check src/tibios_ray/capabilities/{embedding,rerank}.py && uv run pyright src/tibios_ray/capabilities/{embedding,rerank}.py`
+- [x] 5.1 Test: extend `test_provider_conformance.py::test_provider_declares_no_fields` — `EmbeddingProvider` and `RerankProvider` also declare exactly `backends` + `selection_policy`, immutable, completing the parameterization started in 4.1
+- [x] 5.2 Test: `tests/unit/capabilities/test_embedding.py` — successful dispatch (`embed()` via `acquire`/`release`), release guarantee (raise mid-execute / `acquire()` raises), empty-mapping and absent-plan-backend failures, cancellation → `CANCELLED` — same coverage shape as `test_chat.py` 4.3/4.5/4.6/4.7, embedding-specific
+- [x] 5.3 Test: extend `test_embedding.py` — D24 embedding codec: exactly one `OutputChunk`, `sequence=0`, `json.loads(data)` round-trips `{"vectors": [[...], ...]}` in input order; `ExecutionReport` carries none of the vectors (`provider-backend-composition` spec: Embedding output appears on the channel, not the report)
+- [x] 5.4 Implement: `src/tibios_ray/capabilities/embedding.py` — two injected fields, real `execute()` using `dispatch.py`/`requests.py`, D24 embedding codec
+- [x] 5.5 Test: `tests/unit/capabilities/test_rerank.py` — successful dispatch, release guarantee, empty-mapping/absent-plan-backend failures, cancellation — same shape as embedding, rerank-specific
+- [x] 5.6 Test: extend `test_rerank.py` — D24 rerank codec: exactly one `OutputChunk`, `sequence=0`, `json.loads(data)` round-trips `{"results": [{"index": i, "score": s}, ...]}` in order; `ExecutionReport` carries none of the scores (`provider-backend-composition` spec: Rerank output appears on the channel, not the report)
+- [x] 5.7 Implement: `src/tibios_ray/capabilities/rerank.py` — two injected fields, real `execute()`, D24 rerank codec
+- [x] 5.8 Test: complete `test_provider_conformance.py::test_execute_always_raises_no_backend_available_error` split for embedding + rerank (Test Impact table, row 2 — completing the split started in 4.9)
+- [x] 5.9 Test: no-scoring / no-branching check for `embedding.py` and `rerank.py`, mirroring 4.10
+- [x] 5.10 Verify slice 5 green: `uv run pytest tests/unit/capabilities/ && uv run ruff check src/tibios_ray/capabilities/{embedding,rerank}.py && uv run pyright src/tibios_ray/capabilities/{embedding,rerank}.py`
 
 ## Slice 6 — llama.cpp pool (independent of Slices 3-5; depends only on Slice 1)
 
