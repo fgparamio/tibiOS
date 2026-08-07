@@ -8,10 +8,15 @@ variant classifies as Permanent").
 """
 
 
-import pytest
+from datetime import timedelta
 
-from tibios_ray.execution.context import ResolvedModelRef
+import pytest
+from google.protobuf import duration_pb2
+
+from tibios_ray.execution.context import AllocationContract, ResolvedModelRef
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
+from tibios_ray.testing.cancellation import ManualCancellation
+from tibios_ray.testing.channel import InMemoryExecutionChannel
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
 from tibios_ray.transport.errors import (
@@ -20,6 +25,7 @@ from tibios_ray.transport.errors import (
     InvalidObjectVersionError,
     InvalidUlidError,
     MissingFieldError,
+    NegativeDurationError,
 )
 
 _ULID_A = "01J0000000000000000000000A"
@@ -272,6 +278,170 @@ class TestCapabilityFromWire:
         with pytest.raises(EmptyCapabilityError) as excinfo:
             capability_from_wire(message)
         assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+
+class TestDurationFromWire:
+    def test_well_formed_duration_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import duration_from_wire
+
+        duration = duration_pb2.Duration()
+        duration.FromTimedelta(timedelta(minutes=5))
+
+        assert duration_from_wire(duration, field="test") == timedelta(minutes=5)
+
+    def test_negative_duration_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import duration_from_wire
+
+        duration = duration_pb2.Duration(seconds=-1)
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            duration_from_wire(duration, field="AllocationContract.max_execution_duration")
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+        assert "AllocationContract.max_execution_duration" in str(excinfo.value)
+
+    def test_zero_duration_is_accepted(self) -> None:
+        from tibios_ray.transport.convert import duration_from_wire
+
+        assert duration_from_wire(duration_pb2.Duration(), field="test") == timedelta()
+
+
+class TestAllocationContractFromWire:
+    def test_well_formed_allocation_contract_converts_successfully(self) -> None:
+        from tibios_ray.transport.convert import allocation_contract_from_wire
+
+        duration = duration_pb2.Duration()
+        duration.FromTimedelta(timedelta(minutes=5))
+        message = worker_pb2.ExecutionContext(
+            allocation_contract=worker_pb2.AllocationContract(max_execution_duration=duration)
+        )
+
+        result = allocation_contract_from_wire(message)
+
+        assert result == AllocationContract(max_execution_duration=timedelta(minutes=5))
+
+    def test_missing_allocation_contract_raises_classified_rejection(self) -> None:
+        from tibios_ray.transport.convert import allocation_contract_from_wire
+
+        message = worker_pb2.ExecutionContext()
+
+        with pytest.raises(MissingFieldError) as excinfo:
+            allocation_contract_from_wire(message)
+        assert "allocation_contract" in str(excinfo.value)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+    def test_negative_max_execution_duration_raises_negative_duration_error(self) -> None:
+        from tibios_ray.transport.convert import allocation_contract_from_wire
+
+        message = worker_pb2.ExecutionContext(
+            allocation_contract=worker_pb2.AllocationContract(
+                max_execution_duration=duration_pb2.Duration(seconds=-1)
+            )
+        )
+
+        with pytest.raises(NegativeDurationError) as excinfo:
+            allocation_contract_from_wire(message)
+        assert excinfo.value.error_class is ErrorClass.PERMANENT
+
+
+def _well_formed_execution_context_message() -> worker_pb2.ExecutionContext:
+    duration = duration_pb2.Duration()
+    duration.FromTimedelta(timedelta(minutes=5))
+    return worker_pb2.ExecutionContext(
+        workload_id=identity_pb2.WorkloadId(value=_ULID_A),
+        allocation_id=identity_pb2.AllocationId(value=_ULID_B),
+        allocation_contract=worker_pb2.AllocationContract(max_execution_duration=duration),
+        dependencies=[
+            worker_pb2.ResolvedModelRef(
+                object_id=identity_pb2.ObjectId(value=_ULID_C),
+                object_version=identity_pb2.ObjectVersion(value="1"),
+                content_hash=identity_pb2.ContentHash(value="sha256:dep"),
+            )
+        ],
+        security_context=worker_pb2.SecurityContext(
+            tenant_id="tenant-a", principal_id="principal-a", grant_scope=["read", "write"]
+        ),
+        observability_context=worker_pb2.ObservabilityContext(
+            trace_id="trace-a", span_id="span-a"
+        ),
+        execution_parameters={"temperature": "0.7"},
+        worker_capability=worker_pb2.WorkerCapability(value="chat.generate"),
+    )
+
+
+class TestExecutionContextFromWire:
+    def test_composes_full_domain_execution_context(self) -> None:
+        from tibios_ray.transport.convert import execution_context_from_wire
+
+        channel = InMemoryExecutionChannel()
+        cancellation = ManualCancellation()
+
+        result = execution_context_from_wire(
+            _well_formed_execution_context_message(), channel=channel, cancellation=cancellation
+        )
+
+        assert result.workload_id == WorkloadId(_ULID_A)
+        assert result.allocation_id == AllocationId(_ULID_B)
+        assert result.capability == "chat.generate"
+        assert result.allocation_contract == AllocationContract(
+            max_execution_duration=timedelta(minutes=5)
+        )
+        assert result.dependencies == (
+            ResolvedModelRef(
+                object_id=ObjectId(_ULID_C),
+                version=ObjectVersion(1),
+                content_hash=ContentHash("sha256:dep"),
+            ),
+        )
+        assert result.security_context.tenant_id == "tenant-a"
+        assert result.security_context.principal_id == "principal-a"
+        assert result.security_context.grant_scope == ("read", "write")
+        assert result.observability_context.trace_id == "trace-a"
+        assert result.observability_context.span_id == "span-a"
+        assert dict(result.execution_parameters) == {"temperature": "0.7"}
+        assert result.channel is channel
+        assert result.cancellation is cancellation
+
+    def test_missing_workload_id_raises_missing_field_error(self) -> None:
+        from tibios_ray.transport.convert import execution_context_from_wire
+
+        message = _well_formed_execution_context_message()
+        message.ClearField("workload_id")
+
+        with pytest.raises(MissingFieldError) as excinfo:
+            execution_context_from_wire(
+                message, channel=InMemoryExecutionChannel(), cancellation=ManualCancellation()
+            )
+        assert "workload_id" in str(excinfo.value)
+
+    def test_missing_allocation_id_raises_missing_field_error(self) -> None:
+        from tibios_ray.transport.convert import execution_context_from_wire
+
+        message = _well_formed_execution_context_message()
+        message.ClearField("allocation_id")
+
+        with pytest.raises(MissingFieldError) as excinfo:
+            execution_context_from_wire(
+                message, channel=InMemoryExecutionChannel(), cancellation=ManualCancellation()
+            )
+        assert "allocation_id" in str(excinfo.value)
+
+    def test_security_and_observability_context_conversion_is_infallible_when_unset(self) -> None:
+        # design.md: "SecurityContext stays three opaque strings... The
+        # wire->domain step for it is therefore infallible and adds no
+        # rejection scenario." Leaving security_context/observability_context
+        # unset on the wire must not raise — it converts to empty strings.
+        from tibios_ray.transport.convert import execution_context_from_wire
+
+        message = _well_formed_execution_context_message()
+        message.ClearField("security_context")
+        message.ClearField("observability_context")
+
+        result = execution_context_from_wire(
+            message, channel=InMemoryExecutionChannel(), cancellation=ManualCancellation()
+        )
+
+        assert result.security_context.tenant_id == ""
+        assert result.observability_context.trace_id == ""
 
 
 class TestWorkloadIdFromCancelRequest:

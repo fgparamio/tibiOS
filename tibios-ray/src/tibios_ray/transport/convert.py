@@ -12,10 +12,19 @@ guessed, or silently fabricated.
 
 import re
 from collections.abc import Iterable
+from datetime import timedelta
 
+from google.protobuf import duration_pb2
 from google.protobuf.message import Message
 
-from tibios_ray.execution.context import ResolvedModelRef
+from tibios_ray.execution.channel import CancellationToken, ExecutionChannel
+from tibios_ray.execution.context import (
+    AllocationContract,
+    ExecutionContext,
+    ObservabilityContext,
+    ResolvedModelRef,
+    SecurityContext,
+)
 from tibios_ray.execution.ids import AllocationId, ContentHash, ObjectId, ObjectVersion, WorkloadId
 from tibios_ray.transport._generated.tibios.primitives.v1 import identity_pb2
 from tibios_ray.transport._generated.tibios.worker.v1 import worker_pb2
@@ -24,6 +33,7 @@ from tibios_ray.transport.errors import (
     InvalidObjectVersionError,
     InvalidUlidError,
     MissingFieldError,
+    NegativeDurationError,
 )
 
 # Crockford Base32 — the ULID alphabet; excludes I, L, O, U to avoid
@@ -117,6 +127,44 @@ def resolved_model_ref_from_wire(message: worker_pb2.ResolvedModelRef) -> Resolv
     )
 
 
+def duration_from_wire(duration: duration_pb2.Duration, *, field: str) -> timedelta:
+    """`google.protobuf.Duration` -> domain `timedelta`; a negative
+    duration raises `NegativeDurationError` (D9 — "A negative
+    `google.protobuf.Duration` is a `Permanent` rejection"; Python's
+    `timedelta` can hold a negative value unlike Rust's duration type,
+    so this is an explicit runtime check). Shared between this slice's
+    inbound `AllocationContract` conversion and S3b's outbound
+    `ExecutionReport.duration` check — the reason this helper is
+    module-level, not nested."""
+
+    parsed = duration.ToTimedelta()
+    if parsed < timedelta(0):
+        raise NegativeDurationError(field)
+    return parsed
+
+
+def allocation_contract_from_wire(message: worker_pb2.ExecutionContext) -> AllocationContract:
+    """A wire `ExecutionContext` with `allocation_contract` unset raises
+    `MissingFieldError` — reusing the same type as every other unset
+    required field, rather than a dedicated variant, since the failure
+    mode is identical: a required message field carries no value and
+    nothing is defaulted in its place (D9 — "Absent `allocation_contract`
+    on the wire is a `Permanent` rejection, never a default";
+    `18-worker-model.md:56` requires the Worker to enforce the maximum
+    duration, and a Worker with no contract can enforce nothing). A
+    negative `max_execution_duration` raises `NegativeDurationError` via
+    `duration_from_wire`."""
+
+    _require_field(
+        message, "allocation_contract", qualified_name="ExecutionContext.allocation_contract"
+    )
+    duration = duration_from_wire(
+        message.allocation_contract.max_execution_duration,
+        field="AllocationContract.max_execution_duration",
+    )
+    return AllocationContract(max_execution_duration=duration)
+
+
 def capability_from_wire(message: worker_pb2.ExecutionContext) -> str:
     """A wire `ExecutionContext.worker_capability` that is unset raises
     `MissingFieldError`; one that wraps an empty string raises
@@ -148,6 +196,61 @@ def dependencies_from_wire(
     dependency")."""
 
     return tuple(resolved_model_ref_from_wire(message) for message in messages)
+
+
+def security_context_from_wire(message: worker_pb2.SecurityContext) -> SecurityContext:
+    """`SecurityContext` conversion is infallible — three opaque strings,
+    carried, never interpreted (``18-worker-model.md:136``). Unlike the
+    identity-wrapper fields, an unset `security_context` on the wire is
+    NOT rejected: `design.md`'s Key Contracts states retyping is
+    deferred as one unit until a security domain exists, so this step
+    "adds no rejection scenario" — an unset message simply converts to
+    three empty strings."""
+
+    return SecurityContext(
+        tenant_id=message.tenant_id,
+        principal_id=message.principal_id,
+        grant_scope=tuple(message.grant_scope),
+    )
+
+
+def observability_context_from_wire(
+    message: worker_pb2.ObservabilityContext,
+) -> ObservabilityContext:
+    """Also infallible, for the same reason as `security_context_from_wire`."""
+
+    return ObservabilityContext(trace_id=message.trace_id, span_id=message.span_id)
+
+
+def execution_context_from_wire(
+    message: worker_pb2.ExecutionContext,
+    *,
+    channel: ExecutionChannel,
+    cancellation: CancellationToken,
+) -> ExecutionContext:
+    """Composes a full domain `ExecutionContext` from a well-formed wire
+    message, or raises the first classified `ConversionError` a
+    malformed field produces. `security_context`, `observability_context`,
+    and `execution_parameters` are carried verbatim — never interpreted
+    (execution-identity's carried-never-interpreted rule, re-verified at
+    this boundary). `channel`/`cancellation` are domain-only (D8): the
+    wire has no field for either, so the caller supplies them."""
+
+    _require_field(message, "workload_id", qualified_name="ExecutionContext.workload_id")
+    _require_field(message, "allocation_id", qualified_name="ExecutionContext.allocation_id")
+
+    return ExecutionContext(
+        workload_id=workload_id_from_wire(message.workload_id),
+        allocation_id=allocation_id_from_wire(message.allocation_id),
+        capability=capability_from_wire(message),
+        allocation_contract=allocation_contract_from_wire(message),
+        dependencies=dependencies_from_wire(message.dependencies),
+        security_context=security_context_from_wire(message.security_context),
+        observability_context=observability_context_from_wire(message.observability_context),
+        execution_parameters=dict(message.execution_parameters),
+        channel=channel,
+        cancellation=cancellation,
+    )
 
 
 def workload_id_from_cancel_request(message: worker_pb2.CancelRequest) -> WorkloadId:
