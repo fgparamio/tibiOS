@@ -20,7 +20,10 @@ architecture is shaped this way*.
 
 One page. Sections:
 
-- **Status** — `Proposed`, `Accepted`, `Superseded by 000X`, or `Deprecated`.
+- **Status** — `Proposed`, `Accepted`, `Amended by 000X`, `Superseded by 000X`,
+  or `Deprecated`. Use `Amended by` when a later ADR narrows or corrects part
+  of this one but the original reasoning and most of the decision still
+  hold; use `Superseded by` when a later ADR replaces the decision outright.
 - **Context** — the forces at play (technical, project, constraints) that make
   this decision necessary. Stated neutrally, not as an argument for the
   decision.
@@ -33,5 +36,7 @@ One page. Sections:
 ## Numbering
 
 Sequential, zero-padded to 4 digits, never reused: `0001-`, `0002-`, ...
-A superseding ADR gets its own new number; the old one's Status changes to
-`Superseded by 000X`, its content stays as a historical record.
+A superseding or amending ADR gets its own new number; the old one's Status
+changes to `Superseded by 000X` or `Amended by 000X`, its content stays as a
+historical record — never edit an already-`Accepted` ADR's Decision text in
+place.
