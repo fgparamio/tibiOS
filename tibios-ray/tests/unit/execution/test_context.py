@@ -244,10 +244,10 @@ class TestResolvedModelRef:
         ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
-            dependencies={"model": ref},
+            dependencies=(ref,),
         )
-        assert ctx.dependencies["model"] is ref
-        assert isinstance(ctx.dependencies["model"], ResolvedModelRef)
+        assert ctx.dependencies[0] is ref
+        assert isinstance(ctx.dependencies[0], ResolvedModelRef)
 
 
 class TestAllocationContract:
@@ -290,10 +290,10 @@ class TestExecutionContext:
         ctx = FakeExecutionContext(
             capability="chat.generate",
             allocation_contract=_allocation_contract(),
-            dependencies={"model": ref},
+            dependencies=(ref,),
         )
         assert ctx.capability == "chat.generate"
-        assert ctx.dependencies == {"model": ref}
+        assert ctx.dependencies == (ref,)
 
     def test_is_frozen(self) -> None:
         ctx = FakeExecutionContext(

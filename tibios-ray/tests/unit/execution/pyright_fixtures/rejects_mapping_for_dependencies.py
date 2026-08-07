@@ -32,6 +32,7 @@ from tibios_ray.execution.context import (
     ResolvedModelRef,
     SecurityContext,
 )
+from tibios_ray.execution.ids import AllocationId, WorkloadId
 
 
 def _rejects_mapping_for_dependencies(
@@ -40,6 +41,8 @@ def _rejects_mapping_for_dependencies(
     cancellation: CancellationToken,
 ) -> ExecutionContext:
     return ExecutionContext(
+        workload_id=WorkloadId("test-workload"),
+        allocation_id=AllocationId("test-allocation"),
         capability="chat.generate",
         allocation_contract=AllocationContract(max_execution_duration=timedelta(minutes=5)),
         dependencies=dependencies,  # type: ignore[arg-type]
@@ -60,6 +63,8 @@ def _accepts_tuple_for_dependencies(
     # ignore comment — proves the fixture above is testing a real
     # rejection, not a signature pyright would reject for any argument.
     return ExecutionContext(
+        workload_id=WorkloadId("test-workload"),
+        allocation_id=AllocationId("test-allocation"),
         capability="chat.generate",
         allocation_contract=AllocationContract(max_execution_duration=timedelta(minutes=5)),
         dependencies=dependencies,
