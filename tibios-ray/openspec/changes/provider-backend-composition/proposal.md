@@ -4,7 +4,7 @@
 
 Every Capability Provider in `src/tibios_ray/capabilities/` is a zero-field frozen dataclass whose `execute()` unconditionally raises `NoBackendAvailableError`. Meanwhile `engines/` holds three working Backend Adapters (`LlamaCppTextBackend`, `VllmTextBackend`, `OnnxEmbeddingBackend`/`OnnxRerankBackend`), `selection/policy.py` holds a `ModelSelectionPolicy` Protocol, and `worker.py::build_runtime()` — a Composition Root that already exists — constructs all seven Providers **zero-arg**. The pieces are all built and none of them are connected: tibios-ray can accept a gRPC `SubmitJob` end-to-end and can only ever answer `FAILED`.
 
-This change implements [ADR-0001](../../../docs/adr/0001-provider-backend-composition.md) (Backends constructed once at startup, owned by the Composition Root, never by a Provider) and [ADR-0002](../../../docs/adr/0002-provider-backend-selection-delegation.md) (Providers delegate backend *selection* to an injected `ModelSelectionPolicy`) for the capabilities that actually have something to dispatch to.
+This change implements [ADR-0001](../../../docs/adr/0001-provider-backend-composition.md) (Backends constructed once at startup, owned by the Composition Root, never by a Provider), [ADR-0002](../../../docs/adr/0002-provider-backend-selection-delegation.md) (Providers delegate backend *selection* to an injected `ModelSelectionPolicy`), [ADR-0003](../../../docs/adr/0003-backend-resource-ownership.md) (resource ownership vs. Backend-internal concurrency strategy), and [ADR-0004](../../../docs/adr/0004-capability-request-boundary.md) (typed per-capability Requests decode `execution_parameters`, never the Provider or Backend) for the capabilities that actually have something to dispatch to. These four ADRs are axioms for this change — `spec.md` and `design.md` reference them, they do not re-justify them.
 
 ## Scope
 
@@ -83,11 +83,11 @@ Three existing tests assert exactly the invariant this change reverses. The arch
 
 ## Open Design Questions
 
-For `sdd-design`. **Q1 and Q6 are blocking.**
+For `sdd-design`. **Q6 is blocking; Q1 and Q3 are resolved (ADR-0004, ADR-0003).**
 
-1. **Where does the request payload come from? — BLOCKING.** `TextRequest(prompt, max_tokens, temperature, stop)`, `embed(inputs: Sequence[str])`, and `rerank(query, documents)` have **no typed home** in `ExecutionContext`. The only candidate is `execution_parameters: Mapping[str, str]`. Reject-don't-guess forbids inventing values; a `str`-keyed map cannot carry a document list without an encoding decision.
+1. **~~Where does the request payload come from?~~ — RESOLVED by [ADR-0004](../../../docs/adr/0004-capability-request-boundary.md).** Each capability defines a typed `*Request` (`ChatRequest`, `EmbeddingRequest`, `RerankRequest`) implementing `CapabilityRequest.parse(parameters: Mapping[str, str]) -> Self`. All decoding of `execution_parameters` — including JSON-encoding of structured values like `documents` — lives exclusively there, with reject-don't-guess. `sdd-design` defines the concrete `*Request` shapes and their `parse()` rules; it does not reopen where the decoding lives.
 2. **Which `ResolvedModelRef`?** `dependencies` is `tuple[ResolvedModelRef, ...]` — unkeyed (settled deliberately in `worker-context-wiring`). Define behavior for zero, one, and N.
-3. **Residency lifetime.** `LlamaCppTextBackend.acquire()` builds a whole `Llama` per call (seconds-to-minutes of weight loading). Per-request `acquire`/`release` would reload weights every request — defeating ADR-0001's entire rationale while technically obeying its letter. Decide: per-request, cached-per-Provider, or warmed at startup.
+3. **~~Residency lifetime.~~ — RESOLVED by [ADR-0003](../../../docs/adr/0003-backend-resource-ownership.md).** Resource ownership (created once at Backend init) is separate from concurrency strategy (Backend-internal). `LlamaCppTextBackend` moves from per-call `Llama` construction to a pool of N pre-warmed instances, sized via config, checked out/returned in `acquire()`/`release()`. `sdd-design` defines the pool's exhaustion behavior and startup-viability validation; it does not reopen whether pooling is the right strategy.
 4. **Who acts on `ServingPlan.quantization`?** Neither `supports()` nor `acquire()` reads it today. ADR-0002 explicitly defers this to *this* change.
 5. **Non-streaming results onto the channel.** `OutputChunk.data` is `bytes`; embedding vectors and rerank scores need a serialization decision (and the Report may not carry them).
 6. **Failure taxonomy — BLOCKING.** Distinguish *no backend configured*, *plan names an absent backend*, *backend raised*, and *cancelled*. `NoBackendAvailableError` currently covers all of it by accident.
@@ -97,8 +97,8 @@ For `sdd-design`. **Q1 and Q6 are blocking.**
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Q1 unresolved → Providers invent payloads from thin air | High | Blocking gate before apply; reject-don't-guess is non-negotiable |
-| Per-request `acquire()` reloads weights, silently destroying performance | High | Q6/Q3 decision + an explicit test asserting engine construction count |
+| Q6 unresolved → error paths collapse into one accidental catch-all | High | Blocking gate before apply; layered taxonomy per Capability/Backend/Provider/Worker |
+| Pool sizing/exhaustion (ADR-0003) implemented inconsistently across the wired capabilities | Med | `sdd-design` fixes exhaustion behavior once; an explicit test asserting engine construction count (once at startup, never per-request) |
 | Conformance tests get deleted instead of split, losing the unwired guarantee | Med | Rewrites are named deliverables above; unwired assertions must remain |
 | Providers accrete selection logic while "just handling errors" | Med | ADR-0002 forbids it; keep an AST/branch guard on the wired three, allow-listing only dispatch-mechanical forms |
 | Startup crashes when artifacts are absent (dev machines have no GGUF) | Med | Unconfigured → unwired capability, asserted by test; never a hard boot failure |
@@ -116,7 +116,7 @@ Estimated **~600–900 hand-written lines** — over the 400-line review budget,
 
 ## Dependencies
 
-- ADR-0001 and ADR-0002 — both Accepted. **Satisfied.**
+- ADR-0001, ADR-0002, ADR-0003, ADR-0004 — all Accepted. **Satisfied.**
 - `backends/{text,embedding,rerank}.py` Protocols and `engines/{llamacpp,vllm,onnxrt}.py` adapters — all shipped and archived. **Satisfied.**
 - `worker-context-wiring` (`ExecutionContext` now carries `dependencies`, `execution_parameters`, `channel`, `cancellation`) — archived. **Satisfied.**
 - No cross-repo coordination: `../proto/` and `tibios-core` are untouched.
@@ -129,5 +129,5 @@ Estimated **~600–900 hand-written lines** — over the 400-line review budget,
 - [ ] No Provider contains selection logic — the injected `ModelSelectionPolicy` makes every backend choice
 - [ ] With no configuration present, the Worker starts and every capability fails cleanly as unwired — no crash, no fabricated backend
 - [ ] Vision, speech (both), and OCR still raise `NoBackendAvailableError` unconditionally, asserted by test
-- [ ] Backends are constructed exactly once per process, asserted by a construction-count test
+- [ ] Backends, and any pooled resources they own (ADR-0003), are constructed once at startup and never per-request, asserted by a construction-count test
 - [ ] `uv run pytest` / `ruff check` / `pyright` pass; layering and naming guards still find zero violations
