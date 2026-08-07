@@ -5,6 +5,7 @@
 
 mod channel;
 mod in_process;
+mod local_infer;
 mod registry;
 
 use in_process::InProcessWorker;
