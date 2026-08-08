@@ -67,9 +67,9 @@ PR 2 (SDK seam) ─► PR 3 (residency) ─────────────�
 
 No dependencies. May run in parallel with PR 2.
 
-- [ ] 1.1 Test: extend `tests/unit/config/test_config.py` — `TIBIOS_RAY_TENSORRT_ENGINE_PATH` absent → `WorkerConfig.tensorrt_llm is None`; present → `TensorrtLlmConfig(engine_path=...)` with the path returned byte-identical (D38; spec: "Unset artifact path leaves the capability unwired, not crashed")
-- [ ] 1.2 Implement: `src/tibios_ray/config.py` — `TensorrtLlmConfig(engine_path: str)` frozen/slots/kw-only dataclass (D38), `_TENSORRT_ENGINE_PATH = "TIBIOS_RAY_TENSORRT_ENGINE_PATH"` constant, `_tensorrt_config(env)` parser, one `WorkerConfig.tensorrt_llm` field, one `from_env()` line
-- [ ] 1.3 Verify PR 1 green: `uv run pytest tests/unit/config/ && uv run ruff check src/tibios_ray/config.py && uv run pyright src/tibios_ray/config.py`
+- [x] 1.1 Test: extend `tests/unit/config/test_config.py` — `TIBIOS_RAY_TENSORRT_ENGINE_PATH` absent → `WorkerConfig.tensorrt_llm is None`; present → `TensorrtLlmConfig(engine_path=...)` with the path returned byte-identical (D38; spec: "Unset artifact path leaves the capability unwired, not crashed")
+- [x] 1.2 Implement: `src/tibios_ray/config.py` — `TensorrtLlmConfig(engine_path: str)` frozen/slots/kw-only dataclass (D38), `_TENSORRT_ENGINE_PATH = "TIBIOS_RAY_TENSORRT_ENGINE_PATH"` constant, `_tensorrt_config(env)` parser, one `WorkerConfig.tensorrt_llm` field, one `from_env()` line
+- [x] 1.3 Verify PR 1 green: `uv run pytest tests/unit/config/ && uv run ruff check src/tibios_ray/config.py && uv run pyright src/tibios_ray/config.py`
 
 ## PR 2 — SDK seam (Protocols, D35 factory, D39 pre-flight, stub)
 

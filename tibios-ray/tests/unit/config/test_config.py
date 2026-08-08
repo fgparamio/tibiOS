@@ -18,6 +18,7 @@ from tibios_ray.config import (
     ConfigError,
     LlamaCppConfig,
     OnnxConfig,
+    TensorrtLlmConfig,
     VllmConfig,
     WorkerConfig,
 )
@@ -31,6 +32,7 @@ class TestEmptyEnvironment:
         assert config.vllm is None
         assert config.onnx_embedding is None
         assert config.onnx_rerank is None
+        assert config.tensorrt_llm is None
 
 
 class TestOnlyOneEngineConfigured:
@@ -76,6 +78,17 @@ class TestOnlyOneEngineConfigured:
         assert config.onnx_embedding is None
         assert config.onnx_rerank is not None
 
+    def test_tensorrt_llm_configured_leaves_others_none(self) -> None:
+        config = WorkerConfig.from_env(
+            {"TIBIOS_RAY_TENSORRT_ENGINE_PATH": "/engines/my-engine"}
+        )
+
+        assert config.llamacpp is None
+        assert config.vllm is None
+        assert config.onnx_embedding is None
+        assert config.onnx_rerank is None
+        assert config.tensorrt_llm is not None
+
 
 class TestConfiguredValuesAreByteIdentical:
     def test_llamacpp_gguf_path_is_returned_unmodified(self) -> None:
@@ -89,6 +102,14 @@ class TestConfiguredValuesAreByteIdentical:
 
         assert config.vllm is not None
         assert config.vllm.model == "org/exact-model-id"
+
+    def test_tensorrt_engine_path_is_returned_unmodified(self) -> None:
+        config = WorkerConfig.from_env(
+            {"TIBIOS_RAY_TENSORRT_ENGINE_PATH": "/engines/exact-engine-path"}
+        )
+
+        assert config.tensorrt_llm is not None
+        assert config.tensorrt_llm.engine_path == "/engines/exact-engine-path"
 
     def test_onnx_paths_are_returned_unmodified(self) -> None:
         config = WorkerConfig.from_env(
@@ -221,8 +242,19 @@ class TestConfigDataclassShape:
         with pytest.raises(dataclasses.FrozenInstanceError):
             config.model_path = "mutated"  # type: ignore[misc]
 
+    def test_tensorrt_llm_config_is_frozen(self) -> None:
+        config = TensorrtLlmConfig(engine_path="/engines/my-engine")
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            config.engine_path = "mutated"  # type: ignore[misc]
+
     def test_worker_config_is_frozen(self) -> None:
-        config = WorkerConfig(llamacpp=None, vllm=None, onnx_embedding=None, onnx_rerank=None)
+        config = WorkerConfig(
+            llamacpp=None,
+            vllm=None,
+            onnx_embedding=None,
+            onnx_rerank=None,
+            tensorrt_llm=None,
+        )
         with pytest.raises(dataclasses.FrozenInstanceError):
             config.llamacpp = None  # type: ignore[misc]
 
@@ -230,6 +262,10 @@ class TestConfigDataclassShape:
         with pytest.raises(TypeError):
             LlamaCppConfig("/models/model.gguf")  # type: ignore[misc,call-arg]
 
+    def test_tensorrt_llm_config_rejects_positional_arguments(self) -> None:
+        with pytest.raises(TypeError):
+            TensorrtLlmConfig("/engines/my-engine")  # type: ignore[misc,call-arg]
+
     def test_worker_config_rejects_positional_arguments(self) -> None:
         with pytest.raises(TypeError):
-            WorkerConfig(None, None, None, None)  # type: ignore[misc,call-arg]
+            WorkerConfig(None, None, None, None, None)  # type: ignore[misc,call-arg]
