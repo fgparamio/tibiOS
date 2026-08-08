@@ -22,9 +22,10 @@ rationale — the tension ``proposal.md`` flags, unchanged from D6).
 Per the ``provider-backend-composition`` spec's "Composition Root
 Exclusive Backend Ownership": this is the *only* module in
 ``src/tibios_ray/`` that constructs a concrete Backend/engine instance
-(``LlamaCppTextBackend``, ``VllmTextBackend``, ``OnnxEmbeddingBackend``,
-``OnnxRerankBackend``) — enforced by ``tests/unit/test_worker.py``'s
-constructor-call-scan guard (task 7.6). ``engines/__init__.py``'s
+(``LlamaCppTextBackend``, ``VllmTextBackend``, ``TensorrtLlmTextBackend``,
+``OnnxEmbeddingBackend``, ``OnnxRerankBackend``) — enforced by
+``tests/unit/test_worker.py``'s constructor-call-scan guard (task 7.6).
+``engines/__init__.py``'s
 package-level re-export of those same classes is API aliasing, not
 construction, and is not a violation. No wired Provider constructs,
 looks up, or discovers a Backend; each is handed an already-built,
@@ -46,10 +47,12 @@ from tibios_ray.config import WorkerConfig
 from tibios_ray.engines import (
     LLAMA_CPP_BACKEND_ID,
     ONNXRUNTIME_BACKEND_ID,
+    TENSORRT_LLM_BACKEND_ID,
     VLLM_BACKEND_ID,
     LlamaCppTextBackend,
     OnnxEmbeddingBackend,
     OnnxRerankBackend,
+    TensorrtLlmTextBackend,
     VllmTextBackend,
 )
 from tibios_ray.runtime.registry import CapabilityRegistry
@@ -67,8 +70,15 @@ from tibios_ray.selection.preference import PreferenceOrderPolicy
 # competes with either — it backs only `embedding`/`rerank`, disjoint
 # capabilities — but is listed for completeness of the total order D28
 # requires `PreferenceOrderPolicy` to be able to fall back to.
+#
+# D33: TensorRT-LLM is inserted second, right after vLLM — both are
+# GPU-resident, higher-throughput engines than llama.cpp's CPU-first
+# pool, and neither ranks above the other by measurement; vLLM keeps
+# its existing first-place slot (an insertion, not a reorder) purely to
+# avoid re-litigating D28's already-shipped judgment call.
 _BACKEND_PREFERENCE: tuple[BackendId, ...] = (
     VLLM_BACKEND_ID,
+    TENSORRT_LLM_BACKEND_ID,
     LLAMA_CPP_BACKEND_ID,
     ONNXRUNTIME_BACKEND_ID,
 )
@@ -100,6 +110,10 @@ def build_runtime(config: WorkerConfig | None = None) -> WorkerRuntime:
         )
     if config.vllm is not None:
         text[VLLM_BACKEND_ID] = VllmTextBackend(model=config.vllm.model)
+    if config.tensorrt_llm is not None:
+        text[TENSORRT_LLM_BACKEND_ID] = TensorrtLlmTextBackend(
+            engine_path=config.tensorrt_llm.engine_path
+        )
 
     embedding: dict[BackendId, EmbeddingBackend] = {}
     if config.onnx_embedding is not None:

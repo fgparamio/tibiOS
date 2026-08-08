@@ -23,31 +23,63 @@ would see it mutate underneath it — proving the adapter must read
 fields per-iteration and never retain the object.
 """
 
+import asyncio
 from collections.abc import Sequence
 from typing import Any
 
 
 class StubCompletionOutput:
-    """`CompletionOutputLike` double — `text_diff` only (D37; no
-    cumulative `.text` field exists on the real SDK type this module
-    uses, so none is modeled here either)."""
+    """`CompletionOutputLike` double — `text_diff` is the only field the
+    Protocol declares (D37). `text` is an *extra* attribute this stub
+    carries on top of the Protocol, set to the growing cumulative prefix
+    — the "cumulative-`.text` stub" design.md's Testing Strategy calls
+    for: if `generate()` ever read `.text` instead of `text_diff`, a
+    test comparing emitted output against the diffs would see the
+    (wrong, quadratically duplicated) cumulative value instead and
+    fail — CompletionOutputLike itself never promises `.text` exists."""
 
-    def __init__(self, text_diff: str = "") -> None:
+    def __init__(self, text_diff: str = "", text: str = "") -> None:
         self.text_diff = text_diff
+        self.text = text
 
 
 class StubRequestOutput:
     """`RequestOutputLike` double — self-yielding-in-place (see module
     docstring's gotcha). Constructed with the sequence of `text_diff`
     increments `generate_async` will stream; the last increment marks
-    `finished=True`."""
+    `finished=True` unless `finished_at_exhaustion=False`, which lets a
+    test exhaust the stream without ever setting `finished=True` (VL10's
+    defensive-synthetic-terminator case, D34/D37 inherited)."""
 
-    def __init__(self, diffs: Sequence[str] = ()) -> None:
+    def __init__(
+        self,
+        diffs: Sequence[str] = (),
+        *,
+        finished_at_exhaustion: bool = True,
+        pause_before_index: int | None = None,
+        pause_event: "asyncio.Event | None" = None,
+        abort_error: Exception | None = None,
+    ) -> None:
         self._diffs = tuple(diffs)
         self._index = 0
+        self._cumulative = ""
+        self._finished_at_exhaustion = finished_at_exhaustion
         self.outputs: Sequence[StubCompletionOutput] = (StubCompletionOutput(),)
         self.finished = False
         self.abort_calls = 0
+        # Async twin of `StubLlama.parked` / `stub_async_llm.py`'s
+        # `paused` — lets a cancellation test wait until the stream is
+        # genuinely mid-flight (parked in `__anext__`) before
+        # abandoning/cancelling it, with zero timing dependence.
+        self.paused = asyncio.Event()
+        # Set on every `abort()` call — a test can
+        # `await asyncio.wait_for(handle.abort_called.wait(), 1.0)` to
+        # observe the background finalize task (D36) actually running,
+        # with zero sleeps (`stub_async_llm.py`'s `abort_called` twin).
+        self.abort_called = asyncio.Event()
+        self._pause_before_index = pause_before_index
+        self._pause_event = pause_event
+        self._abort_error = abort_error
 
     def __aiter__(self) -> "StubRequestOutput":
         return self
@@ -55,16 +87,27 @@ class StubRequestOutput:
     async def __anext__(self) -> "StubRequestOutput":
         if self._index >= len(self._diffs):
             raise StopAsyncIteration
+        if self._pause_before_index == self._index:
+            self.paused.set()
+            assert self._pause_event is not None, (
+                "pause_before_index set without a pause_event"
+            )
+            await self._pause_event.wait()
         diff = self._diffs[self._index]
         self._index += 1
-        self.outputs = (StubCompletionOutput(text_diff=diff),)
-        self.finished = self._index == len(self._diffs)
+        self._cumulative += diff
+        self.outputs = (StubCompletionOutput(text_diff=diff, text=self._cumulative),)
+        at_exhaustion = self._index == len(self._diffs)
+        self.finished = self._finished_at_exhaustion and at_exhaustion
         return self
 
     async def abort(self) -> None:
         # D36: handle-scoped — no engine-level `abort(request_id)` exists
         # on the real SDK, so this is the entire cancellation surface.
         self.abort_calls += 1
+        self.abort_called.set()
+        if self._abort_error is not None:
+            raise self._abort_error
 
 
 class StubLLM:

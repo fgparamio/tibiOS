@@ -7,21 +7,31 @@ module-local structural Protocols for the SDK surface, a lazy
 refcounted `_ModelRuntime` (VL2, adopted wholesale per design decision
 D34).
 
-**This file's current state is PR 3 of the change's slice plan: the SDK
-seam (PR 2) plus residency** — `_ModelRuntime`/`_SessionEntry`,
-`TensorrtLlmTextBackend.__init__`, `backend_id`, `supports`, `acquire`
-(single-flight under the lock), and `release` (refcounted teardown).
-`generate()`, cancellation, and Composition Root wiring land in PR 4.
+**This file is now complete (PR 4 of the change's slice plan)**: PR 2
+built the SDK seam, PR 3 added residency (`_ModelRuntime`/
+`_SessionEntry`, `acquire`, `release`'s refcounted teardown), and this
+PR adds native-async `generate()` streaming and uniform, handle-scoped
+cancellation (`_finalize`/`_schedule_finalize`) plus Composition Root
+wiring (`worker.py`).
 
 Two SDK-shape differences from `vllm.py`, both already structural in
-this PR's contracts even though `generate()` itself is not implemented
-yet: construction is **blocking** — `LLMLike.shutdown()`/the real
-constructor are plain synchronous calls, so the default factory's body
-is `await asyncio.to_thread(...)` (design decision D35) instead of
-vLLM's on-loop `AsyncLLM.from_engine_args(...)` — and the incremental
-token lives in a **separate field**, `CompletionOutputLike.text_diff`,
-never the cumulative `.text` (design decision D37; encoded structurally
-in the Protocol shape now, read at the actual call site in PR 4).
+earlier PRs' contracts and now exercised at the call site: construction
+is **blocking** — `LLMLike.shutdown()`/the real constructor are plain
+synchronous calls, so the default factory's body is
+`await asyncio.to_thread(...)` (design decision D35) instead of vLLM's
+on-loop `AsyncLLM.from_engine_args(...)` — and the incremental token
+lives in a **separate field**, `CompletionOutputLike.text_diff`, never
+the cumulative `.text` (design decision D37).
+
+A third difference, cancellation-shaped: the handle
+`LLMLike.generate_async` returns IS the async iterator (D36) — there is
+no separate `AsyncGenerator` wrapper and no engine-level
+`abort(request_id)`; `handle.abort()` (no arguments) is the entire
+cancellation surface, and there is no `aclose()` counterpart to call
+alongside it the way `vllm.py`'s `_finalize` always does. `generate()`
+therefore only schedules `_finalize` when the stream did not complete
+cleanly (VL10's "no double-abort on a finished handle" logic simplified
+to reflect the smaller surface).
 
 The Core Principle this Backend exists to make structural — "engine
 compilation is an out-of-band operator/provisioning concern, never a
@@ -41,6 +51,7 @@ compilation step.
 import asyncio
 import importlib
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -308,6 +319,20 @@ class TensorrtLlmTextBackend:
                 raise UnknownSessionError(session.session_id)
 
             runtime = entry.runtime
+
+            # VL13/VL14 inherited: any stream this session never
+            # drained to completion is stranded — finalize (abort) it
+            # explicitly rather than leaving it to the engine's GC.
+            # Popping here is the same single-owner claim `generate()`'s
+            # `finally` uses: whichever side pops the entry first is
+            # the one cleanup path — an outer generator that later gets
+            # closed/GC'd for a stream_key already popped here finds
+            # nothing and does not re-finalize it.
+            for stream_key in list(entry.live):
+                handle = entry.live.pop(stream_key, None)
+                if handle is not None:
+                    _schedule_finalize(runtime, handle)
+
             runtime.refcount -= 1
             if runtime.refcount == 0:
                 # Teardown while still holding the lock (VL13
@@ -320,8 +345,8 @@ class TensorrtLlmTextBackend:
                 #
                 # `release()` is the deterministic join point (VL13):
                 # drain every scheduled-but-not-yet-joined finalize
-                # task before shutdown. `pending` is populated starting
-                # PR 4, so this is a no-op today.
+                # task (this session's own, plus any left over from
+                # earlier sessions of the same engine) before shutdown.
                 if runtime.pending:
                     await asyncio.gather(*list(runtime.pending))
                 await asyncio.to_thread(runtime.engine.shutdown)
@@ -330,8 +355,92 @@ class TensorrtLlmTextBackend:
     async def generate(
         self, session: BackendSession, request: TextRequest
     ) -> AsyncIterator[TextChunk]:
-        raise NotImplementedError("generate() lands in PR 4")
-        yield  # pragma: no cover - makes this an async generator function
+        entry = self._session_for(session)
+        # D36: locally minted, never an SDK-assigned id — the real SDK
+        # exposes no request_id to key off of in the first place.
+        stream_key = f"{session.session_id}:{uuid4().hex}"
+        handle = entry.runtime.engine.generate_async(
+            request.prompt,
+            self._params_factory(request),
+            streaming=True,
+        )
+        entry.live[stream_key] = handle
+        completed = False
+        try:
+            # D35/VL5 inherited: no lock — concurrent multiplexed
+            # requests across sessions of the same engine is the entire
+            # reason to run this engine at all. This async-for is the
+            # entire call path: no bridge thread, no bounded queue, no
+            # bridging machinery of any kind between it and the loop.
+            async for output in handle:
+                completion = output.outputs[0] if output.outputs else None
+                # text_diff, not text — see D37 (the DELTA, never the
+                # cumulative string).
+                text = completion.text_diff if completion is not None else ""
+                if output.finished:
+                    # VL10 inherited: the terminal chunk is sourced
+                    # straight from the SDK's own `finished` field.
+                    completed = True
+                    yield TextChunk(text=text, finished=True)
+                    return
+                if text:  # drop empty non-terminal deltas
+                    yield TextChunk(text=text, finished=False)
+            # VL10 inherited: defensive synthetic terminator — the SDK
+            # handle exhausted without ever setting finished=True.
+            completed = True
+            yield TextChunk(text="", finished=True)
+        finally:
+            # D36/VL11 inherited: await-free — abandonment (aclose())
+            # and task cancellation both resume execution here, and a
+            # direct `await` would be immediately re-cancelled under
+            # the latter, silently skipping the abort. Schedule a
+            # background task instead and let it be joined elsewhere
+            # (release(), VL13).
+            #
+            # VL14 inherited: `entry.live.pop` doubles as a single-
+            # owner claim ticket — if `release()` already popped and
+            # finalized this stream_key (the "consumer suspended and
+            # abandoned" case), this pop returns None and we must not
+            # finalize it again.
+            #
+            # Unlike vllm.py's `_finalize` (always both abort() and
+            # aclose()): there is no aclose() counterpart on this
+            # handle (D36), so a cleanly completed stream needs no
+            # finalize call at all — only schedule it when abandoned.
+            claimed = entry.live.pop(stream_key, None)
+            if claimed is not None and not completed:
+                _schedule_finalize(entry.runtime, claimed)
+
+    def _session_for(self, session: BackendSession) -> _SessionEntry:
+        entry = self._sessions.get(session.session_id)
+        if entry is None:
+            raise UnknownSessionError(session.session_id)
+        return entry
+
+
+def _schedule_finalize(runtime: _ModelRuntime, handle: RequestOutputLike) -> None:
+    """Schedules `_finalize` as a background task and registers it in
+    `runtime.pending` (VL11/VL13 inherited) — never awaited directly
+    from `generate()`'s `finally`. A missing/closed loop (e.g.
+    interpreter shutdown) is swallowed: there is nothing left to join
+    it against."""
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    task = loop.create_task(_finalize(handle))
+    runtime.pending.add(task)
+    task.add_done_callback(runtime.pending.discard)
+
+
+async def _finalize(handle: RequestOutputLike) -> None:
+    # D36: handle.abort() is the entire cancellation surface — no
+    # engine-level abort(request_id), no aclose() counterpart to call
+    # alongside it. Exception-suppressed (VL12's principle inherited):
+    # a failed cleanup must never surface as a Worker-visible error.
+    with suppress(Exception):
+        await handle.abort()
 
 
 def _new_session_id() -> str:

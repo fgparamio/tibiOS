@@ -32,3 +32,10 @@ def test_package_exports_onnxrt_backend_public_names() -> None:
     assert expected <= set(engines.__all__)
     for name in expected:
         assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"
+
+
+def test_package_exports_tensorrt_backend_public_names() -> None:
+    expected = {"TENSORRT_LLM_BACKEND_ID", "TensorrtLlmTextBackend", "LLMLike"}
+    assert expected <= set(engines.__all__)
+    for name in expected:
+        assert hasattr(engines, name), f"tibios_ray.engines.{name} missing"
