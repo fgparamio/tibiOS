@@ -25,12 +25,12 @@ requirements are cited by name; see `specs/tensorrt-llm-text-backend/spec.md`.
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 → PR 2 → PR 3 → PR 4 (adjusted from design.md's 2-PR proposal) |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | **size:exception approved by user (2026-08-07) for PR 2 and PR 4** — no further splitting; both land as planned above the 400-line budget |
 
-Decision needed before apply: Yes
-Chained PRs recommended: Yes
-Chain strategy: pending
-400-line budget risk: High
+Decision needed before apply: Resolved
+Chained PRs recommended: Declined — size:exception approved instead
+Chain strategy: size:exception (PR 2, PR 4)
+400-line budget risk: High, accepted
 
 ### Suggested Work Units
 
