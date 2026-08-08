@@ -126,8 +126,8 @@ The exact shape of this dependency (whether these event types get hoisted into `
 - WHEN they are enumerated
 - THEN none represents `snapshot_id`, cluster topology, or Runtime capabilities
 
-#### Scenario: Doc comment cites both owning docs
+## Open Questions (Deferred — Not Answered By This Change)
 
-- GIVEN `runtime-state/src/lib.rs`
-- WHEN its crate doc comment is read
-- THEN it references both `17-cluster-snapshot.md` and `19-state-assembler.md`
+- **`snapshot_id`**: blocked on minting a `SnapshotId` primitive, an architectural change to `runtime-primitives`/`02-project-structure.md`, same category as the precedent of adding `RuntimeId` — not this slice's call.
+- **Cluster topology and Runtime capabilities**: listed in `17-cluster-snapshot.md`'s Snapshot Contents with zero doc elaboration; deferred, same "intentionally partial" precedent as `runtime-scheduler`'s deferred capability taxonomy.
+- **The State Assembler / Trust → Membership → Health → Resources pipeline** (`19-state-assembler.md`) and any Port or policy: future trait-design follow-up, not this data-only slice.
