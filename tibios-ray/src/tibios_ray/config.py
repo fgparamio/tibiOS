@@ -44,6 +44,7 @@ DEFAULT_LLAMACPP_POOL_SIZE = 1
 _LLAMACPP_GGUF = "TIBIOS_RAY_LLAMACPP_GGUF"
 _LLAMACPP_POOL_SIZE = "TIBIOS_RAY_LLAMACPP_POOL_SIZE"
 _VLLM_MODEL = "TIBIOS_RAY_VLLM_MODEL"
+_TENSORRT_ENGINE_PATH = "TIBIOS_RAY_TENSORRT_ENGINE_PATH"
 
 
 class ConfigError(Exception):
@@ -82,6 +83,16 @@ class VllmConfig:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class TensorrtLlmConfig:
+    """`TIBIOS_RAY_TENSORRT_ENGINE_PATH` (D38). `engine_path` mirrors
+    `engines.tensorrt.TensorrtLlmTextBackend`'s constructor keyword —
+    deliberately not named `model`, since the value is a path to a
+    precompiled engine artifact, never an HF checkpoint (D38)."""
+
+    engine_path: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OnnxConfig:
     """One ONNX artifact triple — used independently for
     `TIBIOS_RAY_ONNX_EMBEDDING_*` and `TIBIOS_RAY_ONNX_RERANK_*` (D19).
@@ -97,13 +108,14 @@ class OnnxConfig:
 class WorkerConfig:
     """Every field `None`-able: `None` means "this engine is not
     configured" (D19). Aggregates all four engine slots the Composition
-    Root can wire — `llamacpp`/`vllm` for `text`, `onnx_embedding` for
-    `embedding`, `onnx_rerank` for `rerank`."""
+    Root can wire — `llamacpp`/`vllm`/`tensorrt_llm` for `text`,
+    `onnx_embedding` for `embedding`, `onnx_rerank` for `rerank`."""
 
     llamacpp: LlamaCppConfig | None
     vllm: VllmConfig | None
     onnx_embedding: OnnxConfig | None
     onnx_rerank: OnnxConfig | None
+    tensorrt_llm: TensorrtLlmConfig | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Self:
@@ -119,6 +131,7 @@ class WorkerConfig:
             vllm=_vllm_config(source),
             onnx_embedding=_onnx_config(source, prefix="TIBIOS_RAY_ONNX_EMBEDDING"),
             onnx_rerank=_onnx_config(source, prefix="TIBIOS_RAY_ONNX_RERANK"),
+            tensorrt_llm=_tensorrt_config(source),
         )
 
 
@@ -158,6 +171,13 @@ def _vllm_config(env: Mapping[str, str]) -> VllmConfig | None:
     if model is None:
         return None
     return VllmConfig(model=model)
+
+
+def _tensorrt_config(env: Mapping[str, str]) -> TensorrtLlmConfig | None:
+    engine_path = env.get(_TENSORRT_ENGINE_PATH)
+    if engine_path is None:
+        return None
+    return TensorrtLlmConfig(engine_path=engine_path)
 
 
 def _onnx_config(env: Mapping[str, str], *, prefix: str) -> OnnxConfig | None:
