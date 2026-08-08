@@ -33,6 +33,22 @@ vllm = ["vllm>=0.9.0,<0.10; python_version < '3.14'"]
 # change that resolves `ResolvedModelRef` into an atomic artifact
 # bundle, not by this extra.
 onnx = ["onnxruntime>=1.20.0", "transformers>=4.46.0"]
+# `tensorrt-llm` ships no repo-wide index entry (D31/D32): PyPI carries
+# only a source distribution (no wheel), and the real prebuilt wheels
+# live on NVIDIA's own index or inside an NGC container image — install
+# with `uv add tibios-ray[tensorrt] --index <NVIDIA's wheel index>`, or
+# use a prebuilt NGC container that already provides it (see the
+# Operational Model; `default_engine_factory`'s `ModuleNotFoundError`
+# repeats this at the point of failure).
+# `python_version < '3.14'` marker (D30), same shape as the `vllm` extra
+# above: verified against PyPI (Aug 2026) — `tensorrt-llm`'s
+# `requires-python` is `>=3.10,<4` but its classifiers tag only
+# 3.10/3.12, no confirmed cp314 wheel — and `requires-python = ">=3.14"`
+# is project-wide, so without this marker `uv lock`/`uv sync`/`uv run`
+# fail to resolve for *everyone*, including the SDK-free unit tier that
+# never imports tensorrt_llm at all (LC11/D39's seam). Revisit (drop the
+# marker) once upstream ships a cp314 build.
+tensorrt = ["tensorrt-llm>=1.2.1,<1.3; python_version < '3.14'"]
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]

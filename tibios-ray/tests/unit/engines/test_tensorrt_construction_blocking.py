@@ -40,7 +40,7 @@ class _ThreadRecordingLLM:
 
 
 @pytest.fixture
-def fake_tensorrt_llm_module(tmp_path: Path) -> Path:
+def fake_tensorrt_llm_module(tmp_path: Path):
     engine_dir = tmp_path / "engine"
     engine_dir.mkdir()
     (engine_dir / "rank0.engine").write_text("")

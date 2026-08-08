@@ -36,15 +36,24 @@ import tibios_ray
 from tibios_ray.capabilities.chat import CHAT_GENERATE_DESCRIPTOR, ChatProvider
 from tibios_ray.capabilities.embedding import EMBEDDING_GENERATE_DESCRIPTOR, EmbeddingProvider
 from tibios_ray.capabilities.rerank import RERANK_DOCUMENTS_DESCRIPTOR, RerankProvider
-from tibios_ray.config import LlamaCppConfig, OnnxConfig, VllmConfig, WorkerConfig
+from tibios_ray.config import (
+    LlamaCppConfig,
+    OnnxConfig,
+    TensorrtLlmConfig,
+    VllmConfig,
+    WorkerConfig,
+)
 from tibios_ray.engines.llamacpp import LLAMA_CPP_BACKEND_ID
 from tibios_ray.engines.onnxrt import ONNXRUNTIME_BACKEND_ID
+from tibios_ray.engines.tensorrt import TENSORRT_LLM_BACKEND_ID
 from tibios_ray.engines.vllm import VLLM_BACKEND_ID
 from tibios_ray.runtime.worker_runtime import WorkerRuntime
 from tibios_ray.selection.policy import Quantization, ServingPlan
-from tibios_ray.worker import build_runtime
+from tibios_ray.worker import _BACKEND_PREFERENCE, build_runtime
 
-_EMPTY_CONFIG = WorkerConfig(llamacpp=None, vllm=None, onnx_embedding=None, onnx_rerank=None)
+_EMPTY_CONFIG = WorkerConfig(
+    llamacpp=None, vllm=None, tensorrt_llm=None, onnx_embedding=None, onnx_rerank=None
+)
 
 
 def _providers(runtime: WorkerRuntime) -> tuple[ChatProvider, EmbeddingProvider, RerankProvider]:
@@ -126,6 +135,7 @@ def test_only_vllm_configured_wires_only_the_chat_provider() -> None:
     config = WorkerConfig(
         llamacpp=None,
         vllm=VllmConfig(model="m"),
+        tensorrt_llm=None,
         onnx_embedding=None,
         onnx_rerank=None,
     )
@@ -144,6 +154,7 @@ def test_only_onnx_embedding_configured_wires_only_the_embedding_provider() -> N
     config = WorkerConfig(
         llamacpp=None,
         vllm=None,
+        tensorrt_llm=None,
         onnx_embedding=OnnxConfig(model_path="model.onnx", tokenizer_path="tokenizer.json"),
         onnx_rerank=None,
     )
@@ -160,6 +171,7 @@ def test_only_onnx_rerank_configured_wires_only_the_rerank_provider() -> None:
     config = WorkerConfig(
         llamacpp=None,
         vllm=None,
+        tensorrt_llm=None,
         onnx_embedding=None,
         onnx_rerank=OnnxConfig(model_path="model.onnx", tokenizer_path="tokenizer.json"),
     )
@@ -180,6 +192,7 @@ def test_only_llamacpp_configured_wires_only_the_chat_provider(
     config = WorkerConfig(
         llamacpp=LlamaCppConfig(model_path=str(model_path), pool_size=1),
         vllm=None,
+        tensorrt_llm=None,
         onnx_embedding=None,
         onnx_rerank=None,
     )
@@ -208,6 +221,7 @@ def test_engines_are_constructed_exactly_once_per_build_runtime_call_never_per_r
     config = WorkerConfig(
         llamacpp=LlamaCppConfig(model_path=str(model_path), pool_size=pool_size),
         vllm=None,
+        tensorrt_llm=None,
         onnx_embedding=None,
         onnx_rerank=None,
     )
@@ -255,6 +269,7 @@ def test_worker_module_is_the_sole_constructor_of_concrete_engine_instances() ->
         {
             "LlamaCppTextBackend",
             "VllmTextBackend",
+            "TensorrtLlmTextBackend",
             "OnnxEmbeddingBackend",
             "OnnxRerankBackend",
         }
@@ -290,6 +305,7 @@ def test_end_to_end_wiring_smoke_with_every_engine_configured(
     config = WorkerConfig(
         llamacpp=LlamaCppConfig(model_path=str(model_path), pool_size=1),
         vllm=VllmConfig(model="m"),
+        tensorrt_llm=TensorrtLlmConfig(engine_path="/engines/m"),
         onnx_embedding=OnnxConfig(model_path="embed.onnx", tokenizer_path="embed-tok.json"),
         onnx_rerank=OnnxConfig(model_path="rerank.onnx", tokenizer_path="rerank-tok.json"),
     )
@@ -298,6 +314,39 @@ def test_end_to_end_wiring_smoke_with_every_engine_configured(
     chat, embedding, rerank = _providers(runtime)
 
     assert isinstance(runtime, WorkerRuntime)
-    assert set(chat.backends) == {LLAMA_CPP_BACKEND_ID, VLLM_BACKEND_ID}
+    assert set(chat.backends) == {LLAMA_CPP_BACKEND_ID, VLLM_BACKEND_ID, TENSORRT_LLM_BACKEND_ID}
     assert set(embedding.backends) == {ONNXRUNTIME_BACKEND_ID}
     assert set(rerank.backends) == {ONNXRUNTIME_BACKEND_ID}
+
+
+def test_only_tensorrt_llm_configured_wires_only_the_chat_provider() -> None:
+    # TensorrtLlmTextBackend performs no SDK work at construction time
+    # (D34, lazy init identical to vLLM's VL2) so this needs no fake
+    # module and no real engine artifact on disk.
+    config = WorkerConfig(
+        llamacpp=None,
+        vllm=None,
+        tensorrt_llm=TensorrtLlmConfig(engine_path="/engines/m"),
+        onnx_embedding=None,
+        onnx_rerank=None,
+    )
+
+    runtime = build_runtime(config)
+    chat, embedding, rerank = _providers(runtime)
+
+    assert set(chat.backends) == {TENSORRT_LLM_BACKEND_ID}
+    assert dict(embedding.backends) == {}
+    assert dict(rerank.backends) == {}
+
+
+def test_backend_preference_order_is_vllm_then_tensorrt_llm_then_llamacpp_then_onnxruntime() -> (
+    None
+):
+    # D33: insertion (not reorder) — vLLM stays first, TensorRT-LLM
+    # inserted second, llama.cpp/onnxruntime keep their relative order.
+    assert _BACKEND_PREFERENCE == (
+        VLLM_BACKEND_ID,
+        TENSORRT_LLM_BACKEND_ID,
+        LLAMA_CPP_BACKEND_ID,
+        ONNXRUNTIME_BACKEND_ID,
+    )
